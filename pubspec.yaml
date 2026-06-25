@@ -1,0 +1,71 @@
+name: store_manager
+description: "Offline-first store manager — products, salespersons, ledger, reports."
+publish_to: 'none'
+version: 1.1.0+2
+
+environment:
+  sdk: ^3.11.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # State management
+  flutter_riverpod: ^2.6.1
+
+  # Local database (reactive SQLite)
+  drift: ^2.20.3
+  sqlite3_flutter_libs: ^0.5.24
+  path_provider: ^2.1.4
+  path: ^1.9.0
+
+  # IDs
+  uuid: ^4.5.1
+
+  # PDF receipts
+  pdf: ^3.11.1
+  printing: ^5.13.3
+
+  # CSV export
+  csv: ^6.0.0
+
+  # Sharing & file picking (backup/restore, export)
+  share_plus: ^10.0.2
+  file_picker: ^8.1.2
+
+  # Number/date formatting (grouping separators)
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+  # Drift codegen
+  drift_dev: ^2.20.3
+  build_runner: ^2.4.13
+
+  # App icon generation
+  flutter_launcher_icons: ^0.14.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icon/
+
+# Original storefront icon on the app's green. Run:
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: false
+  remove_alpha_ios: true
+  image_path: "assets/icon/icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#157A5E"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+  web:
+    generated: true
+    image_path: "assets/icon/icon.png"
+    background_color: "#157A5E"
+    theme_color: "#157A5E"
