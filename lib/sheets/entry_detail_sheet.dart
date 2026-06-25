@@ -8,6 +8,7 @@ import '../app/ui.dart';
 import '../domain/ledger.dart';
 import '../domain/models.dart';
 import '../services/receipt.dart';
+import 'stockin_sheet.dart';
 
 /// Read-only entry detail with a delete-and-re-add correction model
 /// (Section 8). Deleting recalculates every derived figure instantly.
@@ -73,7 +74,22 @@ class _EntryDetail extends ConsumerWidget {
             label: const Text('View receipt'),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(0, 48),
-              side: const BorderSide(color: AppColors.hairline),
+              side: BorderSide(color: AppColors.hairline),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (txn.type == TxnType.stockin) ...[
+          OutlinedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              showStockInSheet(context, ref, existing: txn);
+            },
+            icon: const Icon(Icons.edit_outlined),
+            label: const Text('Edit entry'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 48),
+              side: BorderSide(color: AppColors.hairline),
             ),
           ),
           const SizedBox(height: 12),

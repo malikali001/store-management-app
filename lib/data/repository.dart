@@ -293,6 +293,36 @@ class StoreRepository {
     return id;
   }
 
+  /// Edit a stock-in entry as an atomic delete+create (Section 8) so every
+  /// derived figure re-reconciles. The id and original [createdAt] are kept so
+  /// the entry holds its chronological position.
+  Future<void> editStockIn({
+    required String id,
+    required String productId,
+    required int qty,
+    required int unitBuy,
+    required String date,
+    String? note,
+  }) async {
+    await _db.transaction(() async {
+      final old = await (_db.select(_db.transactions)
+            ..where((t) => t.id.equals(id)))
+          .getSingleOrNull();
+      final createdAt = old?.createdAt ?? DateTime.now().millisecondsSinceEpoch;
+      await (_db.delete(_db.transactions)..where((t) => t.id.equals(id))).go();
+      await _db.into(_db.transactions).insert(db.TransactionsCompanion.insert(
+            id: id,
+            type: 'stockin',
+            date: date,
+            createdAt: createdAt,
+            productId: Value(productId),
+            qty: Value(qty),
+            unitBuy: Value(unitBuy),
+            note: Value(note),
+          ));
+    });
+  }
+
   /// A single line for a sale/return: (productId, qty, unitSell, unitBuy).
   Future<String> addSaleOrReturn({
     required TxnType type, // sale | returnGoods

@@ -233,7 +233,7 @@ class _ProductFormState extends ConsumerState<_ProductForm> {
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(0, 48),
               foregroundColor: AppColors.danger,
-              side: const BorderSide(color: AppColors.danger),
+              side: BorderSide(color: AppColors.danger),
             ),
             child: const Text('Delete'),
           ),
@@ -288,7 +288,7 @@ class _SuggestFieldState extends State<_SuggestField> {
                 ActionChip(
                   label: Text(s),
                   backgroundColor: AppColors.surface,
-                  side: const BorderSide(color: AppColors.hairline),
+                  side: BorderSide(color: AppColors.hairline),
                   onPressed: () {
                     widget.controller.text = s;
                     setState(() {});

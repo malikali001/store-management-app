@@ -118,7 +118,7 @@ class SalesScreen extends ConsumerWidget {
                                           borderRadius:
                                               BorderRadius.circular(6),
                                         ),
-                                        child: const Text('Return',
+                                        child: Text('Return',
                                             style: TextStyle(
                                                 color: AppColors.danger,
                                                 fontSize: 11,
@@ -132,7 +132,7 @@ class SalesScreen extends ConsumerWidget {
                                     '${prettyDate(t.date)} · '
                                     '${formatQty(pieces)} '
                                     '${pieces == 1 ? 'piece' : 'pieces'}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                         color: AppColors.muted, fontSize: 12)),
                               ],
                             ),

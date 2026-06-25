@@ -48,7 +48,7 @@ class ProductField extends StatelessWidget {
           children: [
             Expanded(
               child: title == null
-                  ? const Text('Select product',
+                  ? Text('Select product',
                       style: TextStyle(color: AppColors.muted))
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -59,13 +59,13 @@ class ProductField extends StatelessWidget {
                         if (brand.isNotEmpty) ...[
                           const SizedBox(height: 2),
                           Text(brand,
-                              style: const TextStyle(
+                              style: TextStyle(
                                   color: AppColors.muted, fontSize: 13)),
                         ],
                       ],
                     ),
             ),
-            const Icon(Icons.search, size: 18, color: AppColors.muted),
+            Icon(Icons.search, size: 18, color: AppColors.muted),
           ],
         ),
       ),
@@ -209,7 +209,7 @@ class _ProductRow extends StatelessWidget {
                 if (subtitle.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                           color: AppColors.muted, fontSize: 13)),
                 ],
               ],
@@ -234,7 +234,7 @@ class _ProductRow extends StatelessWidget {
                         color: AppColors.warning.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: const Text('low',
+                      child: Text('low',
                           style: TextStyle(
                               color: AppColors.warning,
                               fontSize: 11,

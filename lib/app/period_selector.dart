@@ -29,9 +29,13 @@ class PeriodSelector extends ConsumerWidget {
             showCheckmark: false,
             backgroundColor: AppColors.surface,
             selectedColor: AppColors.positive,
-            side: const BorderSide(color: AppColors.hairline),
+            side: BorderSide(color: AppColors.hairline),
             labelStyle: TextStyle(
-              color: selected == kind ? Colors.white : AppColors.ink,
+              // On the selected chip the fill is `positive`; match the theme's
+              // onPrimary (black on the brighter dark-mode green, white on light).
+              color: selected == kind
+                  ? (AppColors.dark ? Colors.black : Colors.white)
+                  : AppColors.ink,
               fontWeight: FontWeight.w500,
             ),
             onSelected: (_) =>

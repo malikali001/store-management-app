@@ -28,15 +28,47 @@ Future<void> main() async {
   );
 }
 
-class StoreManagerApp extends StatelessWidget {
+class StoreManagerApp extends ConsumerStatefulWidget {
   const StoreManagerApp({super.key});
 
   @override
+  ConsumerState<StoreManagerApp> createState() => _StoreManagerAppState();
+}
+
+class _StoreManagerAppState extends ConsumerState<StoreManagerApp>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Rebuild when the OS switches light/dark while in "System" mode.
+  @override
+  void didChangePlatformBrightness() => setState(() {});
+
+  @override
   Widget build(BuildContext context) {
+    final mode = ref.watch(themeModeProvider);
+    final systemDark = WidgetsBinding.instance.platformDispatcher
+            .platformBrightness ==
+        Brightness.dark;
+    final isDark = switch (mode) {
+      ThemeMode.dark => true,
+      ThemeMode.light => false,
+      ThemeMode.system => systemDark,
+    };
+
     return MaterialApp(
       title: 'Store Manager',
       debugShowCheckedModeBanner: false,
-      theme: buildTheme(),
+      theme: buildTheme(dark: isDark),
       home: const RootShell(),
     );
   }
@@ -77,8 +109,8 @@ class _RootShellState extends ConsumerState<RootShell> {
     if (!mounted || !status.isStale) return;
     final messenger = ScaffoldMessenger.of(context);
     messenger.showMaterialBanner(MaterialBanner(
-      backgroundColor: const Color(0xFFFBF1DC),
-      leading: const Icon(Icons.shield_outlined, color: AppColors.warning),
+      backgroundColor: AppColors.warnSurface,
+      leading: Icon(Icons.shield_outlined, color: AppColors.warning),
       content: Text(status.lastBackup == null
           ? 'Your data is only on this phone. Back it up so a lost or changed '
               'phone never means lost records.'

@@ -72,7 +72,7 @@ class SalespersonLedgerScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Current balance owed',
+                Text('Current balance owed',
                     style:
                         TextStyle(color: AppColors.muted, fontSize: 13)),
                 const SizedBox(height: 6),
@@ -107,9 +107,9 @@ class SalespersonLedgerScreen extends ConsumerWidget {
           ),
           const SectionTitle('History'),
           if (history.isEmpty)
-            const AppCard(
+            AppCard(
               child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Center(
                   child: Text('No activity yet',
                       style: TextStyle(color: AppColors.muted)),
@@ -140,13 +140,13 @@ class SalespersonLedgerScreen extends ConsumerWidget {
             ),
           const SizedBox(height: 24),
           OutlinedButton.icon(
-            icon: const Icon(Icons.person_remove_outlined,
+            icon: Icon(Icons.person_remove_outlined,
                 color: AppColors.danger),
-            label: const Text('Remove salesperson',
+            label: Text('Remove salesperson',
                 style: TextStyle(color: AppColors.danger)),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(48),
-              side: const BorderSide(color: AppColors.danger),
+              side: BorderSide(color: AppColors.danger),
             ),
             onPressed: exists
                 ? () => _remove(context, ref)
@@ -227,7 +227,7 @@ class _HistoryRow extends StatelessWidget {
                       style: const TextStyle(fontWeight: FontWeight.w500)),
                   const SizedBox(height: 2),
                   Text(prettyDate(txn.date),
-                      style: const TextStyle(
+                      style: TextStyle(
                           color: AppColors.muted, fontSize: 12)),
                 ],
               ),

@@ -214,10 +214,10 @@ Future<void> showReceiptSheet(
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
         const SizedBox(height: 2),
         Text('Receipt $receiptNo · ${prettyDate(theSale.date)}',
-            style: const TextStyle(color: AppColors.muted, fontSize: 13)),
+            style: TextStyle(color: AppColors.muted, fontSize: 13)),
         const SizedBox(height: 2),
         Text('Salesperson: $spName',
-            style: const TextStyle(color: AppColors.muted, fontSize: 13)),
+            style: TextStyle(color: AppColors.muted, fontSize: 13)),
         const SizedBox(height: 16),
         AppCard(
           child: Column(

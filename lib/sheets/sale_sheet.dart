@@ -186,7 +186,7 @@ class _SaleSheetState extends ConsumerState<_SaleSheet> {
           label: const Text('Add item'),
           style: OutlinedButton.styleFrom(
             minimumSize: const Size(0, 48),
-            side: const BorderSide(color: AppColors.hairline),
+            side: BorderSide(color: AppColors.hairline),
           ),
         ),
         const SizedBox(height: 16),
@@ -251,7 +251,7 @@ class _LineRow extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     detail,
-                    style: const TextStyle(color: AppColors.muted, fontSize: 13),
+                    style: TextStyle(color: AppColors.muted, fontSize: 13),
                   ),
                 ],
               ),
@@ -259,7 +259,7 @@ class _LineRow extends StatelessWidget {
             Text(money.format(line.qty * line.unitSell),
                 style: tabularFigures.copyWith(fontWeight: FontWeight.w600)),
             IconButton(
-              icon: const Icon(Icons.close, size: 20, color: AppColors.muted),
+              icon: Icon(Icons.close, size: 20, color: AppColors.muted),
               onPressed: onRemove,
             ),
           ],
@@ -379,7 +379,7 @@ class _LineEditorState extends ConsumerState<_LineEditor> {
         if (available != null) ...[
           const SizedBox(height: 8),
           Text('Available: ${formatQty(available < 0 ? 0 : available)}',
-              style: const TextStyle(color: AppColors.muted, fontSize: 13)),
+              style: TextStyle(color: AppColors.muted, fontSize: 13)),
         ],
         const SizedBox(height: 12),
         Row(
@@ -430,7 +430,7 @@ class _DateRow extends StatelessWidget {
         child: Row(
           children: [
             Expanded(child: Text(prettyDate(date))),
-            const Icon(Icons.calendar_today_outlined,
+            Icon(Icons.calendar_today_outlined,
                 size: 18, color: AppColors.muted),
           ],
         ),

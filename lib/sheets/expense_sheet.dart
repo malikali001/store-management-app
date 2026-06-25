@@ -106,7 +106,7 @@ class _ExpenseSheetState extends ConsumerState<_ExpenseSheet> {
                 ActionChip(
                   label: Text(c),
                   backgroundColor: AppColors.surface,
-                  side: const BorderSide(color: AppColors.hairline),
+                  side: BorderSide(color: AppColors.hairline),
                   onPressed: () {
                     _category.text = c;
                     setState(() {});
@@ -163,7 +163,7 @@ class _DateRow extends StatelessWidget {
         child: Row(
           children: [
             Expanded(child: Text(prettyDate(date))),
-            const Icon(Icons.calendar_today_outlined,
+            Icon(Icons.calendar_today_outlined,
                 size: 18, color: AppColors.muted),
           ],
         ),

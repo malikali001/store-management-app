@@ -57,8 +57,8 @@ class _RecurringSheetState extends ConsumerState<_RecurringSheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SheetHeader('Monthly expenses'),
-        const Padding(
-          padding: EdgeInsets.only(bottom: 12),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
           child: Text(
             'A new month has started. Add this month\'s recurring expenses?',
             style: TextStyle(color: AppColors.muted),

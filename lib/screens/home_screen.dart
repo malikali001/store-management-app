@@ -118,9 +118,9 @@ class _HomeBody extends ConsumerWidget {
           _QuickActions(),
           const SectionTitle('Top salespersons'),
           if (top.isEmpty)
-            const AppCard(
+            AppCard(
               child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Center(
                   child: Text('No sales in this period',
                       style: TextStyle(color: AppColors.muted)),
@@ -186,7 +186,7 @@ class _TopRow extends StatelessWidget {
                       style: const TextStyle(fontWeight: FontWeight.w500)),
                   const SizedBox(height: 2),
                   Text('Owed ${money.format(owed)}',
-                      style: const TextStyle(
+                      style: TextStyle(
                           color: AppColors.muted, fontSize: 13)),
                 ],
               ),
@@ -194,7 +194,7 @@ class _TopRow extends StatelessWidget {
             Text('Took ${money.format(taken)}',
                 style: tabularFigures.copyWith(fontWeight: FontWeight.w500)),
             const SizedBox(width: 8),
-            const Icon(Icons.chevron_right, color: AppColors.muted),
+            Icon(Icons.chevron_right, color: AppColors.muted),
           ],
         ),
       ),

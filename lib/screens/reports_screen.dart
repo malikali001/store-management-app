@@ -223,7 +223,7 @@ class _MutedCard extends StatelessWidget {
     return AppCard(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Text(message, style: const TextStyle(color: AppColors.muted)),
+        child: Text(message, style: TextStyle(color: AppColors.muted)),
       ),
     );
   }

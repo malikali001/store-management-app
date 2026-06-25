@@ -118,7 +118,7 @@ class _PaymentSheetState extends ConsumerState<_PaymentSheet> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Current balance',
+                Text('Current balance',
                     style: TextStyle(color: AppColors.muted)),
                 Text(money.format(balance),
                     style: tabularFigures.copyWith(
@@ -163,7 +163,7 @@ class _DateRow extends StatelessWidget {
         child: Row(
           children: [
             Expanded(child: Text(prettyDate(date))),
-            const Icon(Icons.calendar_today_outlined,
+            Icon(Icons.calendar_today_outlined,
                 size: 18, color: AppColors.muted),
           ],
         ),

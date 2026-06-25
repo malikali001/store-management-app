@@ -203,7 +203,7 @@ class _ReturnSheetState extends ConsumerState<_ReturnSheet> {
           label: const Text('Add item'),
           style: OutlinedButton.styleFrom(
             minimumSize: const Size(0, 48),
-            side: const BorderSide(color: AppColors.hairline),
+            side: BorderSide(color: AppColors.hairline),
           ),
         ),
         const SizedBox(height: 16),
@@ -272,7 +272,7 @@ class _LineRow extends StatelessWidget {
                       style: const TextStyle(fontWeight: FontWeight.w500)),
                   const SizedBox(height: 2),
                   Text(detail,
-                      style: const TextStyle(
+                      style: TextStyle(
                           color: AppColors.muted, fontSize: 13)),
                 ],
               ),
@@ -280,7 +280,7 @@ class _LineRow extends StatelessWidget {
             Text(money.format(line.qty * line.unitSell),
                 style: tabularFigures.copyWith(fontWeight: FontWeight.w600)),
             IconButton(
-              icon: const Icon(Icons.close, size: 20, color: AppColors.muted),
+              icon: Icon(Icons.close, size: 20, color: AppColors.muted),
               onPressed: onRemove,
             ),
           ],
@@ -430,7 +430,7 @@ class _DateRow extends StatelessWidget {
         child: Row(
           children: [
             Expanded(child: Text(prettyDate(date))),
-            const Icon(Icons.calendar_today_outlined,
+            Icon(Icons.calendar_today_outlined,
                 size: 18, color: AppColors.muted),
           ],
         ),

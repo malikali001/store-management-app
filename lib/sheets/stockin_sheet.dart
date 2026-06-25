@@ -10,14 +10,19 @@ import '../domain/models.dart';
 import 'product_picker.dart';
 
 /// Record a stock-in: raises stock, lowers cash (Section 7.2).
+///
+/// Pass [existing] to edit an entry instead — saving re-creates it atomically
+/// (Section 8) so all derived figures stay consistent.
 Future<void> showStockInSheet(BuildContext context, WidgetRef ref,
-    {String? productId}) {
-  return showAppSheet<void>(context, _StockInSheet(productId: productId));
+    {String? productId, Txn? existing}) {
+  return showAppSheet<void>(
+      context, _StockInSheet(productId: productId, existing: existing));
 }
 
 class _StockInSheet extends ConsumerStatefulWidget {
   final String? productId;
-  const _StockInSheet({this.productId});
+  final Txn? existing;
+  const _StockInSheet({this.productId, this.existing});
 
   @override
   ConsumerState<_StockInSheet> createState() => _StockInSheetState();
@@ -30,10 +35,21 @@ class _StockInSheetState extends ConsumerState<_StockInSheet> {
   String _date = todayIso();
   bool _unitBuyTouched = false;
 
+  bool get _isEdit => widget.existing != null;
+
   @override
   void initState() {
     super.initState();
-    _productId = widget.productId;
+    final existing = widget.existing;
+    if (existing != null) {
+      _productId = existing.productId;
+      _qty.text = '${existing.qty ?? 0}';
+      _unitBuy.text = ref.read(moneyProvider).editValue(existing.unitBuy ?? 0);
+      _date = existing.date;
+      _unitBuyTouched = true; // keep the saved price; don't re-sync from product
+    } else {
+      _productId = widget.productId;
+    }
   }
 
   @override
@@ -97,19 +113,30 @@ class _StockInSheetState extends ConsumerState<_StockInSheet> {
     }
 
     try {
-      await repo.addStockIn(
-        productId: _productId!,
-        qty: qty,
-        unitBuy: unitBuy,
-        date: _date,
-      );
+      if (_isEdit) {
+        await repo.editStockIn(
+          id: widget.existing!.id,
+          productId: _productId!,
+          qty: qty,
+          unitBuy: unitBuy,
+          date: _date,
+          note: widget.existing!.note,
+        );
+      } else {
+        await repo.addStockIn(
+          productId: _productId!,
+          qty: qty,
+          unitBuy: unitBuy,
+          date: _date,
+        );
+      }
     } catch (e) {
       if (mounted) showError(context, 'Something went wrong. Please try again.');
       return;
     }
     if (!mounted) return;
     Navigator.pop(context);
-    showToast(context, 'Stock added');
+    showToast(context, _isEdit ? 'Stock updated' : 'Stock added');
   }
 
   @override
@@ -121,11 +148,13 @@ class _StockInSheetState extends ConsumerState<_StockInSheet> {
     // Keep unit-buy in sync with the chosen product (until user edits it).
     if (selected != null) _syncUnitBuy(selected);
 
+    final locked = widget.productId != null || _isEdit;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SheetHeader('Add stock'),
-        if (widget.productId == null)
+        SheetHeader(_isEdit ? 'Edit stock' : 'Add stock'),
+        if (!locked)
           ProductField(
             key: const Key('stockin_product'),
             product: selected,
@@ -142,7 +171,7 @@ class _StockInSheetState extends ConsumerState<_StockInSheet> {
                       style: const TextStyle(fontWeight: FontWeight.w600)),
                 ),
                 Text('In stock ${formatQty(ledger!.stock(selected.id))}',
-                    style: const TextStyle(color: AppColors.muted)),
+                    style: TextStyle(color: AppColors.muted)),
               ],
             ),
           ),
@@ -173,14 +202,14 @@ class _StockInSheetState extends ConsumerState<_StockInSheet> {
         const SizedBox(height: 12),
         _DateField(date: _date, onTap: _pickDate),
         const SizedBox(height: 16),
-        if (selected != null)
+        if (selected != null && !_isEdit)
           Text('This raises stock and lowers cash.',
-              style: const TextStyle(color: AppColors.muted, fontSize: 13)),
+              style: TextStyle(color: AppColors.muted, fontSize: 13)),
         const SizedBox(height: 8),
         FilledButton(
             key: const Key('stockin_save'),
             onPressed: _save,
-            child: const Text('Add stock')),
+            child: Text(_isEdit ? 'Save changes' : 'Add stock')),
       ],
     );
   }
@@ -207,7 +236,7 @@ class _DateField extends StatelessWidget {
         child: Row(
           children: [
             Expanded(child: Text(prettyDate(date))),
-            const Icon(Icons.calendar_today_outlined,
+            Icon(Icons.calendar_today_outlined,
                 size: 18, color: AppColors.muted),
           ],
         ),

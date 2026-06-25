@@ -75,7 +75,7 @@ class PeopleScreen extends ConsumerWidget {
                     color: bal > 0 ? AppColors.danger : AppColors.ink,
                   )),
               const SizedBox(width: 8),
-              const Icon(Icons.chevron_right, color: AppColors.muted),
+              Icon(Icons.chevron_right, color: AppColors.muted),
             ],
           ),
         );

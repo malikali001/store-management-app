@@ -104,7 +104,7 @@ class MetricCard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(label,
-              style: const TextStyle(color: AppColors.muted, fontSize: 13)),
+              style: TextStyle(color: AppColors.muted, fontSize: 13)),
           const SizedBox(height: 8),
           // Shrink-to-fit so long amounts never clip on narrow screens.
           FittedBox(
@@ -220,7 +220,7 @@ class EmptyState extends StatelessWidget {
             const SizedBox(height: 12),
             Text(message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.muted)),
+                style: TextStyle(color: AppColors.muted)),
           ],
         ),
       ),
@@ -256,8 +256,11 @@ class InfoChip extends StatelessWidget {
 }
 
 void showError(BuildContext context, String message) {
+  // `danger` flips brightness with the theme, so the message text must too to
+  // stay legible on it.
+  final onDanger = AppColors.dark ? Colors.black : Colors.white;
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-    content: Text(message),
+    content: Text(message, style: TextStyle(color: onDanger)),
     backgroundColor: AppColors.danger,
   ));
 }
