@@ -103,20 +103,21 @@ void main() {
 
     await goTab(tester, 'Products');
 
-    // "All" shows every category (group titles are "brand · name").
+    // "All" shows every category (group titles are the product name).
     expect(find.textContaining('Cotton tee'), findsWidgets); // T-shirts
     expect(find.textContaining('Runner shoe'), findsWidgets); // Footwear
     expect(find.textContaining('Logo cap'), findsWidgets); // Caps
 
-    // Filter to Footwear → only Runner shoe remains.
-    await tester.tap(find.text('Footwear'));
+    // Filter to Footwear → only Runner shoe remains. Tap the filter chip
+    // specifically; "Footwear" also appears as a group header category label.
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Footwear'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Runner shoe'), findsWidgets);
     expect(find.textContaining('Cotton tee'), findsNothing);
     expect(find.textContaining('Logo cap'), findsNothing);
 
     // Back to All → everything returns.
-    await tester.tap(find.text('All'));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'All'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Cotton tee'), findsWidgets);
     expect(find.textContaining('Logo cap'), findsWidgets);

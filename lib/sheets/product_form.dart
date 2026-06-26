@@ -162,6 +162,21 @@ class _ProductFormState extends ConsumerState<_ProductForm> {
         ref.watch(listValuesProvider('category')).valueOrNull ?? const [];
     final sizes = ref.watch(listValuesProvider('size')).valueOrNull ?? const [];
 
+    // Existing product names, so adding another brand/size of the same product
+    // is a pick rather than a re-type. Picking a known name fills its category.
+    final products =
+        ref.watch(ledgerProvider).valueOrNull?.products ?? const <Product>[];
+    final nameSuggestions = <String>{
+      for (final p in products)
+        if (!p.archived && p.name.trim().isNotEmpty) p.name.trim(),
+    }.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    final categoryByName = <String, String>{};
+    for (final p in products) {
+      if (p.archived || p.category.trim().isEmpty) continue;
+      categoryByName.putIfAbsent(p.name.trim().toLowerCase(), () => p.category.trim());
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -178,11 +193,17 @@ class _ProductFormState extends ConsumerState<_ProductForm> {
           suggestions: sizes,
         ),
         const SizedBox(height: 12),
-        TextField(
-          key: const Key('product_name'),
+        _SuggestField(
+          fieldKey: const Key('product_name'),
           controller: _name,
-          textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(labelText: 'Name'),
+          label: 'Name',
+          suggestions: nameSuggestions,
+          onSelected: (v) {
+            final cat = categoryByName[v.trim().toLowerCase()];
+            if (cat != null && _category.text.trim().isEmpty) {
+              _category.text = cat;
+            }
+          },
         ),
         const SizedBox(height: 12),
         _SuggestField(
@@ -251,10 +272,14 @@ class _SuggestField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
   final List<String> suggestions;
+  final Key? fieldKey;
+  final ValueChanged<String>? onSelected;
   const _SuggestField({
     required this.controller,
     required this.label,
     required this.suggestions,
+    this.fieldKey,
+    this.onSelected,
   });
 
   @override
@@ -273,6 +298,7 @@ class _SuggestFieldState extends State<_SuggestField> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextField(
+          key: widget.fieldKey,
           controller: widget.controller,
           textCapitalization: TextCapitalization.sentences,
           decoration: InputDecoration(labelText: widget.label),
@@ -291,6 +317,7 @@ class _SuggestFieldState extends State<_SuggestField> {
                   side: BorderSide(color: AppColors.hairline),
                   onPressed: () {
                     widget.controller.text = s;
+                    widget.onSelected?.call(s);
                     setState(() {});
                   },
                 ),
