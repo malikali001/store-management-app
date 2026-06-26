@@ -256,11 +256,8 @@ class InfoChip extends StatelessWidget {
 }
 
 void showError(BuildContext context, String message) {
-  // `danger` flips brightness with the theme, so the message text must too to
-  // stay legible on it.
-  final onDanger = AppColors.dark ? Colors.black : Colors.white;
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-    content: Text(message, style: TextStyle(color: onDanger)),
+    content: Text(message, style: const TextStyle(color: Colors.white)),
     backgroundColor: AppColors.danger,
   ));
 }

@@ -28,47 +28,15 @@ Future<void> main() async {
   );
 }
 
-class StoreManagerApp extends ConsumerStatefulWidget {
+class StoreManagerApp extends StatelessWidget {
   const StoreManagerApp({super.key});
 
   @override
-  ConsumerState<StoreManagerApp> createState() => _StoreManagerAppState();
-}
-
-class _StoreManagerAppState extends ConsumerState<StoreManagerApp>
-    with WidgetsBindingObserver {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  // Rebuild when the OS switches light/dark while in "System" mode.
-  @override
-  void didChangePlatformBrightness() => setState(() {});
-
-  @override
   Widget build(BuildContext context) {
-    final mode = ref.watch(themeModeProvider);
-    final systemDark = WidgetsBinding.instance.platformDispatcher
-            .platformBrightness ==
-        Brightness.dark;
-    final isDark = switch (mode) {
-      ThemeMode.dark => true,
-      ThemeMode.light => false,
-      ThemeMode.system => systemDark,
-    };
-
     return MaterialApp(
       title: 'Store Manager',
       debugShowCheckedModeBanner: false,
-      theme: buildTheme(dark: isDark),
+      theme: buildTheme(),
       home: const RootShell(),
     );
   }

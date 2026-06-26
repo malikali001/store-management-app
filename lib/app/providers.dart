@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/database.dart';
@@ -43,37 +42,6 @@ final periodProvider = Provider<Period>((ref) {
   final kind = ref.watch(periodKindProvider);
   return Period.forKind(kind, DateTime.now());
 });
-
-/// App theme mode (system / light / dark), persisted in the settings table
-/// under 'theme_mode'. It is a device UI preference, not store data, so it lives
-/// outside [StoreSettings] and the backup payload.
-final themeModeProvider =
-    NotifierProvider<ThemeModeController, ThemeMode>(ThemeModeController.new);
-
-class ThemeModeController extends Notifier<ThemeMode> {
-  @override
-  ThemeMode build() {
-    _load();
-    return ThemeMode.system;
-  }
-
-  Future<void> _load() async {
-    final raw = await ref.read(repositoryProvider).rawSetting('theme_mode');
-    final mode = _parse(raw);
-    if (mode != state) state = mode;
-  }
-
-  Future<void> set(ThemeMode mode) async {
-    state = mode;
-    await ref.read(repositoryProvider).setSetting('theme_mode', mode.name);
-  }
-
-  static ThemeMode _parse(String? v) => switch (v) {
-        'light' => ThemeMode.light,
-        'dark' => ThemeMode.dark,
-        _ => ThemeMode.system,
-      };
-}
 
 /// Managed dropdown values for a list kind ('brand','category','size',
 /// 'expense_category').

@@ -118,8 +118,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
           ),
-          const SectionTitle('Appearance'),
-          const AppCard(child: _ThemeModeSelector()),
           const SectionTitle('Manage lists'),
           const _ListManager(kind: 'category', title: 'Categories'),
           const SizedBox(height: 12),
@@ -366,49 +364,6 @@ class _ListManagerState extends ConsumerState<_ListManager> {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// Light / Dark / System theme picker, persisted via [themeModeProvider].
-class _ThemeModeSelector extends ConsumerWidget {
-  const _ThemeModeSelector();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final mode = ref.watch(themeModeProvider);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Theme', style: TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 4),
-        Text('Choose how the app looks.',
-            style: TextStyle(color: AppColors.muted, fontSize: 13)),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: SegmentedButton<ThemeMode>(
-            showSelectedIcon: false,
-            segments: const [
-              ButtonSegment(
-                  value: ThemeMode.system,
-                  icon: Icon(Icons.brightness_auto_outlined),
-                  label: Text('System')),
-              ButtonSegment(
-                  value: ThemeMode.light,
-                  icon: Icon(Icons.light_mode_outlined),
-                  label: Text('Light')),
-              ButtonSegment(
-                  value: ThemeMode.dark,
-                  icon: Icon(Icons.dark_mode_outlined),
-                  label: Text('Dark')),
-            ],
-            selected: {mode},
-            onSelectionChanged: (s) =>
-                ref.read(themeModeProvider.notifier).set(s.first),
-          ),
-        ),
-      ],
     );
   }
 }

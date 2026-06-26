@@ -1,71 +1,30 @@
 import 'package:flutter/material.dart';
 
-/// Visual design tokens (Section 15). Calm, clean, ledger-like.
-///
-/// Colours are exposed as getters that resolve against the active brightness
-/// ([dark]). The flag is set by [buildTheme] so every widget that reads a token
-/// recolours when the app theme is rebuilt. Const usages are intentionally
-/// avoided at call sites so the getters can take effect at runtime.
+/// Visual design tokens (Section 15). Calm, clean, ledger-like. Light theme.
 class AppColors {
-  /// Active brightness. Set by [buildTheme]; do not mutate elsewhere.
-  static bool dark = false;
-
-  // -- Light palette --------------------------------------------------------
-  static const _lightBackground = Color(0xFFEEF0ED);
-  static const _lightSurface = Color(0xFFFFFFFF);
-  static const _lightInk = Color(0xFF1C211F);
-  static const _lightMuted = Color(0xFF6C726F);
-  static const _lightHairline = Color(0xFFE4E7E4);
-  static const _lightPositive = Color(0xFF157A5E);
-  static const _lightDanger = Color(0xFFB04A2E);
-  static const _lightWarning = Color(0xFF9A6A0C);
-  static const _lightWarnSurface = Color(0xFFFBF1DC);
-
-  // -- Dark palette ---------------------------------------------------------
-  // A dim, low-glare ledger feel; accents brightened for contrast on dark.
-  static const _darkBackground = Color(0xFF121512);
-  static const _darkSurface = Color(0xFF1B1F1C);
-  static const _darkInk = Color(0xFFE8EBE8);
-  static const _darkMuted = Color(0xFF9AA29D);
-  static const _darkHairline = Color(0xFF2B312D);
-  static const _darkPositive = Color(0xFF4FB592);
-  static const _darkDanger = Color(0xFFE08363);
-  static const _darkWarning = Color(0xFFD9A93F);
-  static const _darkWarnSurface = Color(0xFF332B16);
-
-  static Color get background => dark ? _darkBackground : _lightBackground;
-  static Color get surface => dark ? _darkSurface : _lightSurface;
-  static Color get ink => dark ? _darkInk : _lightInk;
-  static Color get muted => dark ? _darkMuted : _lightMuted;
-  static Color get hairline => dark ? _darkHairline : _lightHairline;
-  static Color get positive => dark ? _darkPositive : _lightPositive; // money in
-  static Color get danger => dark ? _darkDanger : _lightDanger; // money out, owed
-  static Color get warning => dark ? _darkWarning : _lightWarning; // low stock
-  static Color get warnSurface => dark ? _darkWarnSurface : _lightWarnSurface;
+  static const background = Color(0xFFEEF0ED);
+  static const surface = Color(0xFFFFFFFF);
+  static const ink = Color(0xFF1C211F);
+  static const muted = Color(0xFF6C726F);
+  static const hairline = Color(0xFFE4E7E4);
+  static const positive = Color(0xFF157A5E); // money in, profit
+  static const danger = Color(0xFFB04A2E); // money out, owed
+  static const warning = Color(0xFF9A6A0C); // low stock
+  static const warnSurface = Color(0xFFFBF1DC);
 }
 
-ThemeData buildTheme({bool dark = false}) {
-  AppColors.dark = dark; // resolve tokens for this brightness
-
-  final scheme = dark
-      ? ColorScheme.dark(
-          primary: AppColors.positive,
-          onPrimary: Colors.black,
-          surface: AppColors.surface,
-          onSurface: AppColors.ink,
-          error: AppColors.danger,
-        )
-      : ColorScheme.light(
-          primary: AppColors.positive,
-          onPrimary: Colors.white,
-          surface: AppColors.surface,
-          onSurface: AppColors.ink,
-          error: AppColors.danger,
-        );
+ThemeData buildTheme() {
+  final scheme = ColorScheme.light(
+    primary: AppColors.positive,
+    onPrimary: Colors.white,
+    surface: AppColors.surface,
+    onSurface: AppColors.ink,
+    error: AppColors.danger,
+  );
 
   final base = ThemeData(
     useMaterial3: true,
-    brightness: dark ? Brightness.dark : Brightness.light,
+    brightness: Brightness.light,
     colorScheme: scheme,
     scaffoldBackgroundColor: AppColors.background,
     fontFamily: null, // system humanist sans
