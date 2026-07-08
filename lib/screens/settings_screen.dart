@@ -7,6 +7,7 @@ import '../app/theme.dart';
 import '../app/ui.dart';
 import '../data/repository.dart';
 import '../domain/models.dart';
+import '../security/lock_settings.dart';
 import '../services/backup.dart';
 import '../services/backup_status.dart';
 
@@ -125,6 +126,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 12),
           const _ListManager(
               kind: 'expense_category', title: 'Expense categories'),
+          const SectionTitle('Security'),
+          const LockSettingsSection(),
           const SectionTitle('Data'),
           Consumer(builder: (context, ref, _) {
             final status = ref.watch(backupStatusProvider).valueOrNull;

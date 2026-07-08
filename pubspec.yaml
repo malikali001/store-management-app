@@ -36,6 +36,10 @@ dependencies:
 
   # Number/date formatting (grouping separators)
   intl: ^0.19.0
+  local_auth: ^3.0.1
+  flutter_secure_storage: ^10.3.1
+  crypto: ^3.0.7
+  cryptography: ^2.9.0
 
 dev_dependencies:
   flutter_test:

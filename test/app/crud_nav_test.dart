@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:store_manager/app/providers.dart';
+import 'lock_test_support.dart';
 import 'package:store_manager/data/database.dart' show AppDatabase;
 import 'package:store_manager/data/repository.dart';
 import 'package:store_manager/domain/ledger.dart';
@@ -24,7 +25,7 @@ void main() {
     addTearDown(db.close);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [databaseProvider.overrideWithValue(db)],
+        overrides: [databaseProvider.overrideWithValue(db), lockTestOverride()],
         child: const StoreManagerApp(),
       ),
     );

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:store_manager/app/providers.dart';
+import 'lock_test_support.dart';
 import 'package:store_manager/data/database.dart' show AppDatabase;
 import 'package:store_manager/data/repository.dart';
 import 'package:store_manager/main.dart';
@@ -33,7 +34,7 @@ void main() {
     await repo.resetToSampleData(); // gives the store data worth losing
 
     final container = ProviderContainer(
-        overrides: [databaseProvider.overrideWithValue(db)]);
+        overrides: [databaseProvider.overrideWithValue(db), lockTestOverride()]);
     addTearDown(container.dispose);
     await container.read(ledgerProvider.future); // first ledger snapshot
 
@@ -55,7 +56,7 @@ void main() {
     await StoreRepository(db).seedIfEmpty(); // empty, defaults only
 
     final container = ProviderContainer(
-        overrides: [databaseProvider.overrideWithValue(db)]);
+        overrides: [databaseProvider.overrideWithValue(db), lockTestOverride()]);
     addTearDown(container.dispose);
     await container.read(ledgerProvider.future);
 
@@ -72,7 +73,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [databaseProvider.overrideWithValue(db)],
+        overrides: [databaseProvider.overrideWithValue(db), lockTestOverride()],
         child: const StoreManagerApp(),
       ),
     );

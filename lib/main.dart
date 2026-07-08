@@ -13,6 +13,7 @@ import 'screens/products_screen.dart';
 import 'screens/sales_screen.dart';
 import 'screens/people_screen.dart';
 import 'screens/reports_screen.dart';
+import 'security/lock_gate.dart';
 import 'services/backup.dart';
 import 'services/backup_status.dart';
 import 'sheets/recurring_expense_sheet.dart';
@@ -92,7 +93,7 @@ class StoreManagerApp extends StatelessWidget {
       title: 'Store Manager',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
-      home: const RootShell(),
+      home: const LockGate(child: RootShell()),
     );
   }
 }

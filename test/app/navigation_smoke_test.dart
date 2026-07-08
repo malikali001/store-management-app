@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:store_manager/app/providers.dart';
+import 'lock_test_support.dart';
 import 'package:store_manager/data/database.dart';
 import 'package:store_manager/data/repository.dart';
 import 'package:store_manager/main.dart';
@@ -17,7 +18,7 @@ void main() {
     await StoreRepository(db).resetToSampleData();
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [databaseProvider.overrideWithValue(db)],
+        overrides: [databaseProvider.overrideWithValue(db), lockTestOverride()],
         child: const StoreManagerApp(),
       ),
     );
