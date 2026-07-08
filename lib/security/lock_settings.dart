@@ -11,6 +11,7 @@ import '../app/theme.dart';
 import '../app/ui.dart';
 import 'lock_controller.dart';
 import 'lock_service.dart';
+import 'recovery_sheets.dart';
 
 class LockSettingsSection extends ConsumerStatefulWidget {
   const LockSettingsSection({super.key});
@@ -25,6 +26,7 @@ class _LockSettingsSectionState extends ConsumerState<LockSettingsSection> {
   bool _enabled = false;
   bool _biometricPreferred = false;
   bool _biometricAvailable = false;
+  bool _hasRecovery = false;
   int _autoLockMinutes = 0;
 
   LockService get _service => ref.read(lockServiceProvider);
@@ -39,12 +41,14 @@ class _LockSettingsSectionState extends ConsumerState<LockSettingsSection> {
     final enabled = await _service.isEnabled();
     final bioPref = await _service.isBiometricPreferred();
     final bioAvail = await _service.biometricAvailable();
+    final hasRecovery = await _service.hasRecoveryCode();
     final mins = await _service.autoLockMinutes();
     if (!mounted) return;
     setState(() {
       _enabled = enabled;
       _biometricPreferred = bioPref;
       _biometricAvailable = bioAvail;
+      _hasRecovery = hasRecovery;
       _autoLockMinutes = mins;
       _loading = false;
     });
@@ -53,10 +57,29 @@ class _LockSettingsSectionState extends ConsumerState<LockSettingsSection> {
   Future<void> _turnOn() async {
     final pin = await _promptNewPin();
     if (pin == null) return;
+    // Show a recovery code and require the user to confirm they saved it before
+    // the lock is actually turned on — so they always have a way back in.
+    final code = _service.generateRecoveryCode();
+    if (!mounted) return;
+    final saved = await showRecoveryCodeSheet(context, code);
+    if (saved != true) return;
+    await _service.setRecoveryCode(code);
     await _service.setPin(pin);
     await ref.read(lockControllerProvider.notifier).refresh();
     if (!mounted) return;
     showToast(context, 'App lock turned on');
+    await _load();
+  }
+
+  Future<void> _resetRecovery() async {
+    if (!await _confirmCurrentPin()) return;
+    final code = _service.generateRecoveryCode();
+    if (!mounted) return;
+    final saved = await showRecoveryCodeSheet(context, code);
+    if (saved != true) return;
+    await _service.setRecoveryCode(code);
+    if (!mounted) return;
+    showToast(context, 'Recovery code updated');
     await _load();
   }
 
@@ -182,7 +205,25 @@ class _LockSettingsSectionState extends ConsumerState<LockSettingsSection> {
                   ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 4),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.vpn_key_outlined, color: AppColors.ink),
+              title: const Text('Recovery code'),
+              subtitle: Text(
+                _hasRecovery
+                    ? 'Used to reset a forgotten PIN.'
+                    : 'Not set — you could be locked out if you forget the PIN.',
+                style: TextStyle(
+                    color: _hasRecovery ? AppColors.muted : AppColors.warning,
+                    fontSize: 12),
+              ),
+              trailing: TextButton(
+                onPressed: _resetRecovery,
+                child: Text(_hasRecovery ? 'Reset' : 'Set up'),
+              ),
+            ),
+            const SizedBox(height: 8),
             Row(
               children: [
                 OutlinedButton(

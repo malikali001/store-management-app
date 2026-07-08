@@ -3,6 +3,8 @@
 /// local_auth. Plugin calls (secure storage, biometrics) only run on-device.
 library;
 
+import 'dart:math';
+
 import 'package:local_auth/local_auth.dart';
 
 import 'lock_policy.dart';
@@ -49,6 +51,7 @@ class LockService {
   /// Turn the lock off and forget the PIN/biometric preference.
   Future<void> disable() async {
     await _store.delete(SecureStore.kPinHash);
+    await _store.delete(SecureStore.kRecoveryHash);
     await _store.write(SecureStore.kLockEnabled, '0');
     await _store.delete(SecureStore.kBiometricEnabled);
     await _resetFailures();
@@ -72,6 +75,12 @@ class LockService {
     await _store.delete(SecureStore.kLastFailureMs);
   }
 
+  Future<void> _recordFailure(int attempts, DateTime ts) async {
+    await _store.write(SecureStore.kFailedAttempts, '${attempts + 1}');
+    await _store.write(
+        SecureStore.kLastFailureMs, '${ts.millisecondsSinceEpoch}');
+  }
+
   /// Cool-down remaining right now (zero if input is allowed).
   Future<Duration> lockoutRemaining({DateTime? now}) async {
     return LockPolicy.remaining(
@@ -90,9 +99,63 @@ class LockService {
       await _resetFailures();
       return PinResult.ok;
     }
-    await _store.write(SecureStore.kFailedAttempts, '${attempts + 1}');
-    await _store.write(
-        SecureStore.kLastFailureMs, '${ts.millisecondsSinceEpoch}');
+    await _recordFailure(attempts, ts);
+    return PinResult.wrong;
+  }
+
+  // ---- Recovery code -------------------------------------------------------
+  //
+  // A recovery code lets the owner reset a forgotten PIN without losing data.
+  // It is a high-entropy secret shown once at setup for the user to save; only
+  // its hash is stored (same PBKDF2 as the PIN), so it is a genuine second
+  // credential, not a backdoor.
+
+  static const _alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no I,L,O,0,1
+  static const _codeLen = 12; // ~59 bits of entropy
+
+  /// Generate a fresh recovery code, formatted in groups for readability
+  /// (e.g. "A7KM-3QRT-9XYZ"). Does not store anything.
+  String generateRecoveryCode() {
+    final rng = Random.secure();
+    final chars = [
+      for (var i = 0; i < _codeLen; i++) _alphabet[rng.nextInt(_alphabet.length)],
+    ];
+    final buf = StringBuffer();
+    for (var i = 0; i < chars.length; i++) {
+      if (i > 0 && i % 4 == 0) buf.write('-');
+      buf.write(chars[i]);
+    }
+    return buf.toString();
+  }
+
+  /// Normalise user input: uppercase, keep only A–Z/0–9 (so hyphens/spaces and
+  /// case do not matter when typing the code).
+  static String normaliseRecoveryCode(String code) =>
+      code.toUpperCase().replaceAll(RegExp('[^A-Z0-9]'), '');
+
+  Future<bool> hasRecoveryCode() async =>
+      (await _store.read(SecureStore.kRecoveryHash)) != null;
+
+  /// Store the hash of [code]. Call with the code shown to the user at setup.
+  Future<void> setRecoveryCode(String code) => _store.write(
+      SecureStore.kRecoveryHash, Pin.hash(normaliseRecoveryCode(code)));
+
+  /// Verify a recovery [code] and, if correct, set [newPin] (keeping the lock
+  /// on). Applies the same throttling as PIN entry.
+  Future<PinResult> resetPinWithRecovery(String code, String newPin,
+      {DateTime? now}) async {
+    final ts = now ?? DateTime.now();
+    final attempts = await _failedAttempts();
+    final last = await _lastFailure();
+    if (LockPolicy.isLockedOut(attempts, last, ts)) return PinResult.lockedOut;
+
+    final stored = await _store.read(SecureStore.kRecoveryHash);
+    if (stored != null &&
+        Pin.verify(normaliseRecoveryCode(code), stored)) {
+      await setPin(newPin); // sets new PIN, keeps lock on, resets failures
+      return PinResult.ok;
+    }
+    await _recordFailure(attempts, ts);
     return PinResult.wrong;
   }
 

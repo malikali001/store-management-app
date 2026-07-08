@@ -16,6 +16,7 @@ class SecureStore {
 
   // Keys.
   static const kPinHash = 'lock_pin_hash';
+  static const kRecoveryHash = 'lock_recovery_hash';
   static const kLockEnabled = 'lock_enabled';
   static const kBiometricEnabled = 'lock_biometric';
   static const kFailedAttempts = 'lock_failed_attempts';

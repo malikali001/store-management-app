@@ -8,8 +8,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app/theme.dart';
+import '../app/ui.dart';
 import 'lock_controller.dart';
 import 'lock_service.dart';
+import 'recovery_sheets.dart';
 
 class LockScreen extends ConsumerStatefulWidget {
   const LockScreen({super.key});
@@ -62,6 +64,17 @@ class _LockScreenState extends ConsumerState<LockScreen> {
         if (r <= Duration.zero) _ticker?.cancel();
       });
     }
+  }
+
+  Future<void> _forgotPin() async {
+    if (!await _service.hasRecoveryCode()) {
+      if (!mounted) return;
+      showError(context,
+          'No recovery code was set. Use biometrics, or reinstall and restore from a backup.');
+      return;
+    }
+    if (!mounted) return;
+    await showForgotPinSheet(context, ref);
   }
 
   Future<void> _tryBiometric({bool explicit = false}) async {
@@ -160,6 +173,10 @@ class _LockScreenState extends ConsumerState<LockScreen> {
                       : () => _tryBiometric(explicit: true),
                   icon: const Icon(Icons.fingerprint),
                   label: const Text('Use biometrics'),
+                ),
+                TextButton(
+                  onPressed: _busy ? null : _forgotPin,
+                  child: const Text('Forgot PIN?'),
                 ),
               ],
             ),

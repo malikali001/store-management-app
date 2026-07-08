@@ -55,4 +55,48 @@ void main() {
     expect(find.text('Enter your PIN'), findsNothing);
     expect(find.text('Products'), findsWidgets); // bottom nav is present
   });
+
+  testWidgets('Forgot PIN? → recovery code resets the PIN and unlocks',
+      (tester) async {
+    tester.view.physicalSize = const Size(1200, 2200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    final service = LockService(store: FakeSecureStore());
+    await service.setPin('1234');
+    final code = service.generateRecoveryCode();
+    await service.setRecoveryCode(code);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          databaseProvider.overrideWithValue(db),
+          lockServiceProvider.overrideWithValue(service),
+        ],
+        child: const StoreManagerApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Enter your PIN'), findsOneWidget);
+
+    // Open the recovery flow.
+    await tester.tap(find.text('Forgot PIN?'));
+    await tester.pumpAndSettle();
+    expect(find.text('Reset your PIN'), findsOneWidget);
+
+    // Fill recovery code, new PIN, confirm — the three fields in order.
+    final fields = find.byType(TextField);
+    await tester.enterText(fields.at(0), code);
+    await tester.enterText(fields.at(1), '5678');
+    await tester.enterText(fields.at(2), '5678');
+    await tester.tap(find.widgetWithText(FilledButton, 'Reset PIN'));
+    await tester.pumpAndSettle();
+
+    // Unlocked, and the new PIN is what now verifies.
+    expect(find.text('Enter your PIN'), findsNothing);
+    expect(await service.verifyPin('5678'), PinResult.ok);
+  });
 }
