@@ -53,6 +53,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icon/
+    - assets/fonts/
 
 # Original storefront icon on the app's green. Run:
 #   dart run flutter_launcher_icons

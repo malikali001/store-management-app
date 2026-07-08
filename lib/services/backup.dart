@@ -20,11 +20,15 @@ Future<void> backupToFile(BuildContext context, WidgetRef ref) async {
     final json = await repo.exportBackup();
     final str = const JsonEncoder.withIndent('  ').convert(json);
     final filename = 'store-backup-${todayIso()}.json';
-    await shareBytes(
+    final shared = await shareBytes(
         Uint8List.fromList(utf8.encode(str)), filename, 'application/json');
-    // Record that an off-device backup was made (drives the staleness nudge).
-    await repo.setSetting(
-        kLastBackupKey, '${DateTime.now().millisecondsSinceEpoch}');
+    // Only record a successful off-device backup (drives the staleness nudge).
+    // If the user dismissed the share sheet the data never left the device, so
+    // we must keep nudging.
+    if (shared) {
+      await repo.setSetting(
+          kLastBackupKey, '${DateTime.now().millisecondsSinceEpoch}');
+    }
   } catch (e) {
     if (context.mounted) {
       showError(context, 'Could not create the backup. Please try again.');

@@ -68,13 +68,13 @@ class _ProductFormState extends ConsumerState<_ProductForm> {
       return;
     }
     final buy = money.parse(_buy.text);
-    if (buy == null) {
+    if (buy == null || buy < 0) {
       showError(context, 'Enter a valid buy price.');
       return;
     }
     final sell = money.parse(_sell.text);
-    if (sell == null) {
-      showError(context, 'Enter a valid sell price.');
+    if (sell == null || sell <= 0) {
+      showError(context, 'Enter a sell price greater than zero.');
       return;
     }
 

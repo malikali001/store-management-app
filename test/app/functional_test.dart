@@ -71,6 +71,13 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Opens the People tab and selects the Staff (salespersons) segment.
+  Future<void> goStaff(WidgetTester tester) async {
+    await goTab(tester, 'People');
+    await tester.tap(find.text('Staff'));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('1. Add a product → appears on Products', (tester) async {
     bigSurface(tester);
     final db = await pumpApp(tester);
@@ -127,7 +134,7 @@ void main() {
     bigSurface(tester);
     final db = await pumpApp(tester);
 
-    await goTab(tester, 'People');
+    await goStaff(tester);
     expect(find.textContaining('No salespersons yet'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.add));
@@ -406,7 +413,7 @@ void main() {
     expect((await ledgerOf(db)).balance(spId), -500);
 
     // Open the salesperson ledger from People and tap the payment entry.
-    await goTab(tester, 'People');
+    await goStaff(tester);
     await tester.tap(find.text('Priya').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Payment received').first);

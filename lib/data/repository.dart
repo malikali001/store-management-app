@@ -55,12 +55,16 @@ class StoreRepository {
       _db.select(_db.transactions).get(),
       _db.select(_db.transactionLines).get(),
       _db.select(_db.settingsItems).get(),
+      _db.select(_db.shops).get(),
+      _db.select(_db.shopPurchases).get(),
     ]);
     final pRows = results[0] as List<db.Product>;
     final sRows = results[1] as List<db.Salesperson>;
     final tRows = results[2] as List<db.Transaction>;
     final lRows = results[3] as List<db.TransactionLine>;
     final setRows = results[4] as List<db.SettingsItem>;
+    final shopRows = results[5] as List<db.Shop>;
+    final purchaseRows = results[6] as List<db.ShopPurchase>;
 
     final linesByTxn = <String, List<TxnLine>>{};
     for (final l in lRows) {
@@ -79,6 +83,8 @@ class StoreRepository {
       salespersons: sRows.map(_toSalesperson).toList(),
       txns: tRows.map((t) => _toTxn(t, linesByTxn[t.id] ?? const [])).toList(),
       settings: _settingsFrom(setRows),
+      shops: shopRows.map(_toShop).toList(),
+      shopPurchases: purchaseRows.map(_toShopPurchase).toList(),
     );
   }
 
@@ -104,6 +110,27 @@ class StoreRepository {
         opening: r.opening,
         openingMarginBp: r.openingMarginBp,
         archived: r.archived,
+        createdAt: r.createdAt,
+      );
+
+  Shop _toShop(db.Shop r) => Shop(
+        id: r.id,
+        name: r.name,
+        ownerName: r.ownerName,
+        phone: r.phone,
+        address: r.address,
+        note: r.note,
+        archived: r.archived,
+        createdAt: r.createdAt,
+      );
+
+  ShopPurchase _toShopPurchase(db.ShopPurchase r) => ShopPurchase(
+        id: r.id,
+        shopId: r.shopId,
+        salespersonId: r.salespersonId,
+        date: r.date,
+        amount: r.amount,
+        note: r.note,
         createdAt: r.createdAt,
       );
 
@@ -250,6 +277,58 @@ class StoreRepository {
     }
     await (_db.delete(_db.salespersons)..where((t) => t.id.equals(id))).go();
   }
+
+  // ---- Shops (external customers) -------------------------------------------
+
+  Future<void> upsertShop(Shop s) =>
+      _db.into(_db.shops).insertOnConflictUpdate(
+            db.ShopsCompanion.insert(
+              id: s.id,
+              name: s.name,
+              ownerName: Value(s.ownerName),
+              phone: Value(s.phone),
+              address: Value(s.address),
+              note: Value(s.note),
+              archived: Value(s.archived),
+              createdAt: s.createdAt,
+            ),
+          );
+
+  Future<void> archiveShop(String id, {bool archived = true}) =>
+      (_db.update(_db.shops)..where((t) => t.id.equals(id)))
+          .write(db.ShopsCompanion(archived: Value(archived)));
+
+  /// Delete a shop and all of its purchase history (a single DB transaction).
+  Future<void> deleteShop(String id) async {
+    await _db.transaction(() async {
+      await (_db.delete(_db.shopPurchases)..where((t) => t.shopId.equals(id)))
+          .go();
+      await (_db.delete(_db.shops)..where((t) => t.id.equals(id))).go();
+    });
+  }
+
+  Future<String> addShopPurchase({
+    required String shopId,
+    required int amount,
+    required String date,
+    String? salespersonId,
+    String? note,
+  }) async {
+    final id = newId();
+    await _db.into(_db.shopPurchases).insert(db.ShopPurchasesCompanion.insert(
+          id: id,
+          shopId: shopId,
+          salespersonId: Value(salespersonId),
+          date: date,
+          amount: amount,
+          note: Value(note),
+          createdAt: DateTime.now().millisecondsSinceEpoch,
+        ));
+    return id;
+  }
+
+  Future<void> deleteShopPurchase(String id) =>
+      (_db.delete(_db.shopPurchases)..where((t) => t.id.equals(id))).go();
 
   // ---- Transactions ---------------------------------------------------------
 
@@ -399,6 +478,29 @@ class StoreRepository {
     return id;
   }
 
+  /// Post several expenses in a single DB transaction, so a failure mid-way
+  /// leaves none of them (used by the month-start recurring prompt, 9.5).
+  Future<void> addExpensesBatch(
+      List<({String category, int amount, String date, bool recurring})>
+          expenses) async {
+    await _db.transaction(() async {
+      for (final e in expenses) {
+        await _db.into(_db.transactions).insert(db.TransactionsCompanion.insert(
+              id: newId(),
+              type: 'expense',
+              date: e.date,
+              createdAt: DateTime.now().millisecondsSinceEpoch,
+              category: Value(e.category),
+              amount: Value(e.amount),
+              recurring: Value(e.recurring),
+            ));
+        if (e.category.trim().isNotEmpty) {
+          await addListValue('expense_category', e.category);
+        }
+      }
+    });
+  }
+
   // ---- Seeding & reset ------------------------------------------------------
 
   Future<bool> isEmpty() async {
@@ -433,6 +535,9 @@ class StoreRepository {
       await _insertProducts(demo.products);
       await _insertSalespersons(demo.salespersons);
       await _insertTxns(demo.txns);
+      await _insertShops(DemoData.shops(created));
+      await _insertShopPurchases(
+          DemoData.shopPurchases(now, createdBase: created));
       await _insertList('brand', demo.brands);
       await _insertList('category', demo.categories);
       await _insertList('size', demo.sizes);
@@ -552,10 +657,41 @@ class StoreRepository {
   Future<void> _wipe() async {
     await _db.delete(_db.transactionLines).go();
     await _db.delete(_db.transactions).go();
+    await _db.delete(_db.shopPurchases).go();
+    await _db.delete(_db.shops).go();
     await _db.delete(_db.products).go();
     await _db.delete(_db.salespersons).go();
     await _db.delete(_db.lists).go();
     await _db.delete(_db.settingsItems).go();
+  }
+
+  Future<void> _insertShops(List<Shop> shops) async {
+    for (final s in shops) {
+      await _db.into(_db.shops).insert(db.ShopsCompanion.insert(
+            id: s.id,
+            name: s.name,
+            ownerName: Value(s.ownerName),
+            phone: Value(s.phone),
+            address: Value(s.address),
+            note: Value(s.note),
+            archived: Value(s.archived),
+            createdAt: s.createdAt,
+          ));
+    }
+  }
+
+  Future<void> _insertShopPurchases(List<ShopPurchase> purchases) async {
+    for (final p in purchases) {
+      await _db.into(_db.shopPurchases).insert(db.ShopPurchasesCompanion.insert(
+            id: p.id,
+            shopId: p.shopId,
+            salespersonId: Value(p.salespersonId),
+            date: p.date,
+            amount: p.amount,
+            note: Value(p.note),
+            createdAt: p.createdAt,
+          ));
+    }
   }
 
   // ---- Backup / restore (Section 12) ---------------------------------------
@@ -613,6 +749,29 @@ class StoreRepository {
                           'unit_buy': ln.unitBuy,
                         })
                     .toList(),
+              })
+          .toList(),
+      'shops': l.shops
+          .map((s) => {
+                'id': s.id,
+                'name': s.name,
+                'owner_name': s.ownerName,
+                'phone': s.phone,
+                'address': s.address,
+                'note': s.note,
+                'archived': s.archived,
+                'created_at': s.createdAt,
+              })
+          .toList(),
+      'shop_purchases': l.shopPurchases
+          .map((p) => {
+                'id': p.id,
+                'shop_id': p.shopId,
+                'salesperson_id': p.salespersonId,
+                'date': p.date,
+                'amount': p.amount,
+                'note': p.note,
+                'created_at': p.createdAt,
               })
           .toList(),
       'lists': lists.map((r) => {'kind': r.kind, 'value': r.value}).toList(),
@@ -689,6 +848,30 @@ class StoreRepository {
                   unitSell: (ln['unit_sell'] as num).toInt(),
                   unitBuy: (ln['unit_buy'] as num).toInt()));
         }
+      }
+      // Shops and their purchase log (absent in pre-v2 backups → skipped).
+      for (final s in ((json['shops'] ?? []) as List).cast<Map>()) {
+        await _db.into(_db.shops).insert(db.ShopsCompanion.insert(
+              id: s['id'] as String,
+              name: s['name'] as String,
+              ownerName: Value((s['owner_name'] ?? '') as String),
+              phone: Value((s['phone'] ?? '') as String),
+              address: Value((s['address'] ?? '') as String),
+              note: Value((s['note'] ?? '') as String),
+              archived: Value((s['archived'] ?? false) as bool),
+              createdAt: (s['created_at'] as num).toInt(),
+            ));
+      }
+      for (final p in ((json['shop_purchases'] ?? []) as List).cast<Map>()) {
+        await _db.into(_db.shopPurchases).insert(db.ShopPurchasesCompanion.insert(
+              id: p['id'] as String,
+              shopId: p['shop_id'] as String,
+              salespersonId: Value(p['salesperson_id'] as String?),
+              date: p['date'] as String,
+              amount: (p['amount'] as num).toInt(),
+              note: Value(p['note'] as String?),
+              createdAt: (p['created_at'] as num).toInt(),
+            ));
       }
       for (final r in ((json['lists'] ?? []) as List).cast<Map>()) {
         await _db.into(_db.lists).insertOnConflictUpdate(db.ListsCompanion.insert(

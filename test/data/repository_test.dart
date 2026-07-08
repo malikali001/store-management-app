@@ -77,6 +77,20 @@ void main() {
     expect(l.cashOnHand, 1000 - 250);
   });
 
+  test('addExpensesBatch posts every expense atomically', () async {
+    await repo.addExpensesBatch([
+      (category: 'Rent', amount: 300, date: date, recurring: true),
+      (category: 'Transport', amount: 120, date: date, recurring: true),
+    ]);
+    final l = await repo.loadLedger();
+    final expenses = l.txns.where((t) => t.type == TxnType.expense).toList();
+    expect(expenses.length, 2);
+    expect(l.cashOnHand, 1000 - 420);
+    // Categories are captured into the expense_category list.
+    expect(await repo.listValues('expense_category'),
+        containsAll(<String>['Rent', 'Transport']));
+  });
+
   test('deleting a transaction restores prior figures', () async {
     await repo.addStockIn(productId: 'p1', qty: 10, unitBuy: 60, date: date);
     final saleId = await repo.addSaleOrReturn(

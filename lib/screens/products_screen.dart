@@ -7,9 +7,25 @@ import '../app/theme.dart';
 import '../app/ui.dart';
 import '../domain/ledger.dart';
 import '../domain/models.dart';
-import '../sheets/entry_detail_sheet.dart';
 import '../sheets/product_form.dart';
-import '../sheets/stockin_sheet.dart';
+import 'product_detail_screen.dart';
+
+/// How the products list is ordered.
+enum ProductSort {
+  nameAsc,
+  stockAsc,
+  stockDesc,
+  priceDesc,
+  priceAsc;
+
+  String get label => switch (this) {
+        ProductSort.nameAsc => 'Name (A–Z)',
+        ProductSort.stockAsc => 'Stock: low to high',
+        ProductSort.stockDesc => 'Stock: high to low',
+        ProductSort.priceDesc => 'Price: high to low',
+        ProductSort.priceAsc => 'Price: low to high',
+      };
+}
 
 /// Section 7.2 — products list, grouped by brand + name.
 class ProductsScreen extends ConsumerStatefulWidget {
@@ -22,6 +38,7 @@ class ProductsScreen extends ConsumerStatefulWidget {
 class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   String _query = '';
   String? _category; // null = all categories
+  ProductSort _sort = ProductSort.nameAsc;
 
   bool _matches(Product p, String q) {
     if (q.isEmpty) return true;
@@ -39,6 +56,29 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       appBar: AppBar(
         title: const Text('Products'),
         actions: [
+          PopupMenuButton<ProductSort>(
+            tooltip: 'Sort',
+            icon: const Icon(Icons.sort),
+            initialValue: _sort,
+            onSelected: (s) => setState(() => _sort = s),
+            itemBuilder: (context) => [
+              for (final s in ProductSort.values)
+                PopupMenuItem(
+                  value: s,
+                  child: Row(
+                    children: [
+                      Icon(Icons.check,
+                          size: 18,
+                          color: s == _sort
+                              ? AppColors.positive
+                              : Colors.transparent),
+                      const SizedBox(width: 8),
+                      Text(s.label),
+                    ],
+                  ),
+                ),
+            ],
+          ),
           IconButton(
             tooltip: 'Add product',
             icon: const Icon(Icons.add),
@@ -85,7 +125,53 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           '${p.name.trim().toLowerCase()}|||${p.category.trim().toLowerCase()}';
       (groups[key] ??= []).add(p);
     }
-    final groupKeys = groups.keys.toList()..sort();
+    // Order variants within each group, then order the groups, by the chosen
+    // sort. Stock/price sorts fall back to name so ties stay stable.
+    int stockOf(Product p) => ledger.stock(p.id);
+    int byName(Product a, Product b) =>
+        a.name.toLowerCase().compareTo(b.name.toLowerCase());
+
+    Comparator<Product> variantCmp = switch (_sort) {
+      ProductSort.nameAsc => _compareVariants,
+      ProductSort.stockAsc => (a, b) => stockOf(a).compareTo(stockOf(b)),
+      ProductSort.stockDesc => (a, b) => stockOf(b).compareTo(stockOf(a)),
+      ProductSort.priceAsc => (a, b) => a.sellPrice.compareTo(b.sellPrice),
+      ProductSort.priceDesc => (a, b) => b.sellPrice.compareTo(a.sellPrice),
+    };
+
+    final entries = groups.entries.map((e) {
+      final items = [...e.value]..sort((a, b) {
+          final c = variantCmp(a, b);
+          return c != 0 ? c : _compareVariants(a, b);
+        });
+      return items;
+    }).toList();
+
+    entries.sort((a, b) {
+      final int v;
+      switch (_sort) {
+        case ProductSort.nameAsc:
+          v = 0; // fall through to name tiebreak below
+          break;
+        case ProductSort.stockAsc:
+          v = a.map(stockOf).reduce((x, y) => x < y ? x : y).compareTo(
+              b.map(stockOf).reduce((x, y) => x < y ? x : y));
+          break;
+        case ProductSort.stockDesc:
+          v = b.map(stockOf).reduce((x, y) => x > y ? x : y).compareTo(
+              a.map(stockOf).reduce((x, y) => x > y ? x : y));
+          break;
+        case ProductSort.priceAsc:
+          v = a.map((p) => p.sellPrice).reduce((x, y) => x < y ? x : y).compareTo(
+              b.map((p) => p.sellPrice).reduce((x, y) => x < y ? x : y));
+          break;
+        case ProductSort.priceDesc:
+          v = b.map((p) => p.sellPrice).reduce((x, y) => x > y ? x : y).compareTo(
+              a.map((p) => p.sellPrice).reduce((x, y) => x > y ? x : y));
+          break;
+      }
+      return v != 0 ? v : byName(a.first, b.first);
+    });
 
     return Column(
       children: [
@@ -133,9 +219,9 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                 )
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                  itemCount: groupKeys.length,
+                  itemCount: entries.length,
                   itemBuilder: (context, i) {
-                    final items = groups[groupKeys[i]]!..sort(_compareVariants);
+                    final items = entries[i];
                     final first = items.first;
                     final title = first.name;
                     final category = first.category.trim();
@@ -177,8 +263,12 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                                     stock: ledger.stock(items[j].id),
                                     lowStock: ledger.settings.lowStock,
                                     money: money,
-                                    onTap: () => _openActions(
-                                        context, ledger, items[j]),
+                                    onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => ProductDetailScreen(
+                                            productId: items[j].id),
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ],
@@ -191,107 +281,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                 ),
         ),
       ],
-    );
-  }
-
-  Future<void> _openActions(
-      BuildContext context, Ledger ledger, Product product) {
-    final money = ref.watch(moneyProvider);
-    final stock = ledger.stock(product.id);
-    final recent = ledger.txns
-        .where((t) => t.type == TxnType.stockin && t.productId == product.id)
-        .toList()
-      ..sort((a, b) => Txn.compare(b, a));
-
-    final label = [
-      product.name,
-      if (product.brand.trim().isNotEmpty) product.brand.trim(),
-      if (product.size.trim().isNotEmpty) product.size.trim(),
-    ].join(' · ');
-
-    return showAppSheet(
-      context,
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SheetHeader(label),
-          Row(
-            children: [
-              Expanded(
-                child: _Stat(
-                    label: 'Current stock', value: formatQty(stock)),
-              ),
-              Expanded(
-                child: _Stat(
-                    label: 'Sell price',
-                    value: money.format(product.sellPrice)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  icon: const Icon(Icons.add_box_outlined),
-                  label: const Text('Add stock'),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    showStockInSheet(context, ref, productId: product.id);
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Edit details'),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    showProductForm(context, ref, existing: product);
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Text('Recent stock added',
-                style: TextStyle(fontWeight: FontWeight.w600)),
-          ),
-          const SizedBox(height: 8),
-          if (recent.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text('No stock added yet',
-                  style: TextStyle(color: AppColors.muted)),
-            )
-          else
-            AppCard(
-              padding: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  for (var i = 0; i < recent.length && i < 5; i++) ...[
-                    if (i > 0) const Divider(height: 1),
-                    ListTile(
-                      title: Text(
-                          '+${formatQty(recent[i].qty ?? 0)} @ '
-                          '${money.format(recent[i].unitBuy ?? 0)}'),
-                      subtitle: Text(prettyDate(recent[i].date)),
-                      trailing: Icon(Icons.chevron_right,
-                          color: AppColors.muted),
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        showEntryDetail(context, ref, recent[i]);
-                      },
-                    ),
-                  ],
-                ],
-              ),
-            ),
-        ],
-      ),
     );
   }
 }
@@ -424,27 +413,6 @@ class _CategoryChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
         ),
       ),
-    );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  final String label;
-  final String value;
-  const _Stat({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label,
-            style: TextStyle(color: AppColors.muted, fontSize: 13)),
-        const SizedBox(height: 4),
-        Text(value,
-            style: tabularFigures.copyWith(
-                fontSize: 20, fontWeight: FontWeight.w600)),
-      ],
     );
   }
 }

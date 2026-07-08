@@ -43,7 +43,9 @@ final backupStatusProvider = FutureProvider<BackupStatus>((ref) async {
   final hasData = ledger != null &&
       (ledger.products.isNotEmpty ||
           ledger.salespersons.isNotEmpty ||
-          ledger.txns.isNotEmpty);
+          ledger.txns.isNotEmpty ||
+          ledger.shops.isNotEmpty ||
+          ledger.shopPurchases.isNotEmpty);
   return BackupStatus(
     lastBackup: ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms),
     hasData: hasData,

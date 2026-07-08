@@ -49,8 +49,8 @@ Future<void> exportProductsCsv(BuildContext context, WidgetRef ref) async {
       p.brand,
       p.category,
       p.size,
-      money.format(p.buyPrice),
-      money.format(p.sellPrice),
+      money.editValue(p.buyPrice),
+      money.editValue(p.sellPrice),
       ledger.stock(p.id),
     ]);
   }
@@ -73,10 +73,10 @@ Future<void> exportSalespersonsCsv(BuildContext context, WidgetRef ref) async {
     final goodsTaken = s.opening + ledger.sellTaken(s.id);
     rows.add([
       s.name,
-      money.format(goodsTaken),
-      money.format(ledger.paymentsBy(s.id)),
-      money.format(ledger.balance(s.id)),
-      money.format(ledger.recognisedProfit(s.id)),
+      money.editValue(goodsTaken),
+      money.editValue(ledger.paymentsBy(s.id)),
+      money.editValue(ledger.balance(s.id)),
+      money.editValue(ledger.recognisedProfit(s.id)),
     ]);
   }
   await _shareCsv(context, 'salespersons-${todayIso()}.csv', rows);
@@ -132,7 +132,7 @@ Future<void> exportTransactionsCsv(BuildContext context, WidgetRef ref) async {
     switch (t.type) {
       case TxnType.stockin:
         detail = '${productName(t.productId ?? '')} ×${t.qty ?? 0}';
-        moneyOut = money.format((t.qty ?? 0) * (t.unitBuy ?? 0));
+        moneyOut = money.editValue((t.qty ?? 0) * (t.unitBuy ?? 0));
         break;
       case TxnType.sale:
         detail = linesDetail(t);
@@ -142,13 +142,13 @@ Future<void> exportTransactionsCsv(BuildContext context, WidgetRef ref) async {
         break;
       case TxnType.payment:
         detail = (t.note ?? '').trim();
-        moneyIn = money.format(t.amount ?? 0);
+        moneyIn = money.editValue(t.amount ?? 0);
         break;
       case TxnType.expense:
         final cat = (t.category ?? '').trim();
         final note = (t.note ?? '').trim();
         detail = note.isEmpty ? cat : '$cat — $note';
-        moneyOut = money.format(t.amount ?? 0);
+        moneyOut = money.editValue(t.amount ?? 0);
         break;
     }
 

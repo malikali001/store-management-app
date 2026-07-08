@@ -40,6 +40,13 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Opens the People tab and selects the Staff (salespersons) segment.
+  Future<void> goStaff(WidgetTester tester) async {
+    await goTab(tester, 'People');
+    await tester.tap(find.text('Staff'));
+    await tester.pumpAndSettle();
+  }
+
   // ---- EDIT ---------------------------------------------------------------
 
   testWidgets('Edit a product: change its sell price through the UI',
@@ -72,7 +79,7 @@ void main() {
         .upsertSalesperson(Salesperson(id: 's1', name: 'Old Name', createdAt: now()));
     await tester.pumpAndSettle();
 
-    await goTab(tester, 'People');
+    await goStaff(tester);
     await tester.tap(find.text('Old Name').first);
     await tester.pumpAndSettle();
     // Edit action in the ledger app bar.
@@ -145,7 +152,7 @@ void main() {
         .upsertSalesperson(Salesperson(id: 's1', name: 'Settled Sam', createdAt: now()));
     await tester.pumpAndSettle();
 
-    await goTab(tester, 'People');
+    await goStaff(tester);
     await tester.tap(find.text('Settled Sam').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remove salesperson'));
@@ -181,7 +188,7 @@ void main() {
         .upsertSalesperson(Salesperson(id: 's1', name: 'Sam', createdAt: now()));
     await tester.pumpAndSettle();
 
-    await goTab(tester, 'People');
+    await goStaff(tester);
     await tester.tap(find.text('Sam').first);
     await tester.pumpAndSettle();
     expect(find.text('Record payment'), findsWidgets); // on the ledger

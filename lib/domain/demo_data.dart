@@ -302,4 +302,88 @@ class DemoData {
       },
     );
   }
+
+  static const _msPerDay = 86400000;
+
+  // (id, name, owner, phone, address, joinedDaysAgo)
+  static const _shops = <List<Object>>[
+    ['shop_metro', 'Metro Mart', 'Kamran Sheikh', '0300 1234567',
+        'Main Bazaar, Lahore', 210],
+    ['shop_hilltop', 'Hilltop Traders', 'Imran Butt', '0301 2345678',
+        'Model Town, Lahore', 120],
+    ['shop_corner', 'Corner Store', 'Rashid Ali', '0302 3456789',
+        'Township, Lahore', 150],
+    ['shop_fresh', 'Fresh Picks', 'Nadia Aslam', '0303 4567890',
+        'Johar Town, Lahore', 10],
+    ['shop_bazaar', 'Old Bazaar Supplies', 'Farooq Khan', '0304 5678901',
+        'Anarkali, Lahore', 300],
+  ];
+
+  /// Demo external customers. [createdBase] is "now" in epoch-ms; each shop's
+  /// join date is offset into the past so the segments (New / Reliable /
+  /// Inactive …) look believable.
+  static List<Shop> shops(int createdBase) => [
+        for (final s in _shops)
+          Shop(
+            id: s[0] as String,
+            name: s[1] as String,
+            ownerName: s[2] as String,
+            phone: s[3] as String,
+            address: s[4] as String,
+            createdAt: createdBase - (s[5] as int) * _msPerDay,
+          ),
+      ];
+
+  static String _isoDaysAgo(DateTime now, int days) {
+    final d = now.subtract(Duration(days: days));
+    final m = d.month.toString().padLeft(2, '0');
+    final dd = d.day.toString().padLeft(2, '0');
+    return '${d.year}-$m-$dd';
+  }
+
+  /// Demo purchase log giving a spread of buying behaviours: Metro Mart is the
+  /// top, reliable buyer; Hilltop is reliable; Corner is a regular; Fresh Picks
+  /// is brand new; Old Bazaar has gone quiet (inactive).
+  static List<ShopPurchase> shopPurchases(DateTime now,
+      {required int createdBase}) {
+    var clock = createdBase;
+    var seq = 0;
+    // (shopId, daysAgo, amount, salespersonId?)
+    const rows = <List<Object?>>[
+      // Metro Mart — long-term, frequent, recent, biggest spender.
+      ['shop_metro', 200, 45000, 'sp_bilal'],
+      ['shop_metro', 160, 38000, 'sp_bilal'],
+      ['shop_metro', 120, 52000, 'sp_amir'],
+      ['shop_metro', 80, 41000, 'sp_bilal'],
+      ['shop_metro', 40, 60000, 'sp_sana'],
+      ['shop_metro', 15, 47000, 'sp_bilal'],
+      ['shop_metro', 3, 55000, 'sp_amir'],
+      // Hilltop Traders — reliable, steady.
+      ['shop_hilltop', 110, 12000, 'sp_sana'],
+      ['shop_hilltop', 85, 14000, 'sp_sana'],
+      ['shop_hilltop', 60, 11000, 'sp_hina'],
+      ['shop_hilltop', 30, 13000, 'sp_hina'],
+      ['shop_hilltop', 10, 15000, 'sp_sana'],
+      // Corner Store — a regular (few orders).
+      ['shop_corner', 70, 9000, 'sp_usman'],
+      ['shop_corner', 40, 8000, null],
+      // Fresh Picks — brand new, one order.
+      ['shop_fresh', 5, 6000, 'sp_ayesha'],
+      // Old Bazaar — used to buy, now quiet.
+      ['shop_bazaar', 250, 20000, 'sp_amir'],
+      ['shop_bazaar', 200, 18000, 'sp_amir'],
+      ['shop_bazaar', 130, 16000, 'sp_bilal'],
+    ];
+    return [
+      for (final r in rows)
+        ShopPurchase(
+          id: 'sp_purchase_${seq++}',
+          shopId: r[0] as String,
+          date: _isoDaysAgo(now, r[1] as int),
+          amount: r[2] as int,
+          salespersonId: r[3] as String?,
+          createdAt: clock += 1000,
+        ),
+    ];
+  }
 }

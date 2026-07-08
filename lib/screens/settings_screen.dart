@@ -158,7 +158,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _actionRow(
                   icon: Icons.restore_outlined,
                   label: 'Restore from backup',
-                  onTap: () => restoreFromFile(context, ref),
+                  onTap: _restore,
                 ),
                 const Divider(height: 16),
                 _actionRow(
@@ -184,6 +184,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _restore() async {
+    await restoreFromFile(context, ref);
+    if (!mounted) return;
+    // The restored settings differ from what the fields currently show; force a
+    // re-hydrate so a later field save cannot write stale values over the
+    // restored data.
+    setState(() => _initialised = false);
   }
 
   Future<void> _loadDemo() async {

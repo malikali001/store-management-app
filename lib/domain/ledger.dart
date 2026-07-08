@@ -23,11 +23,20 @@ class Ledger {
   final List<Txn> txns;
   final StoreSettings settings;
 
+  /// External customers (retailers). Default empty so pure-domain tests that
+  /// only exercise the transaction ledger need not supply them.
+  final List<Shop> shops;
+
+  /// "Shop bought from us" events (amount + date, no credit/stock effect).
+  final List<ShopPurchase> shopPurchases;
+
   Ledger({
     required this.products,
     required this.salespersons,
     required this.txns,
     required this.settings,
+    this.shops = const [],
+    this.shopPurchases = const [],
   });
 
   Product? product(String id) {
@@ -69,6 +78,71 @@ class Ledger {
       }
     }
     return n;
+  }
+
+  /// Net units of a product sold to salespersons: Σ sale line qty − Σ return
+  /// line qty. (What has left the shop for good, at the line level.)
+  int unitsSold(String productId) {
+    var n = 0;
+    for (final t in txns) {
+      if (t.type == TxnType.sale) {
+        for (final l in t.lines) {
+          if (l.productId == productId) n += l.qty;
+        }
+      } else if (t.type == TxnType.returnGoods) {
+        for (final l in t.lines) {
+          if (l.productId == productId) n -= l.qty;
+        }
+      }
+    }
+    return n;
+  }
+
+  /// Net sell-value of a product across all sales, less returns (using the
+  /// unit_sell snapshots). The revenue this product has generated.
+  int salesRevenue(String productId) {
+    var n = 0;
+    for (final t in txns) {
+      if (t.type == TxnType.sale) {
+        for (final l in t.lines) {
+          if (l.productId == productId) n += l.lineSell;
+        }
+      } else if (t.type == TxnType.returnGoods) {
+        for (final l in t.lines) {
+          if (l.productId == productId) n -= l.lineSell;
+        }
+      }
+    }
+    return n;
+  }
+
+  /// Value currently sitting as stock for one product: max(0, stock) × buy.
+  int productStockValue(String productId) {
+    final p = product(productId);
+    if (p == null) return 0;
+    final s = stock(productId);
+    return s > 0 ? s * p.buyPrice : 0;
+  }
+
+  /// Every ledger movement that touches [productId] — stock-ins for it, plus
+  /// sales/returns whose lines include it — oldest first (by date, createdAt).
+  List<Txn> productMovements(String productId) {
+    final out = <Txn>[];
+    for (final t in txns) {
+      switch (t.type) {
+        case TxnType.stockin:
+          if (t.productId == productId) out.add(t);
+          break;
+        case TxnType.sale:
+        case TxnType.returnGoods:
+          if (t.lines.any((l) => l.productId == productId)) out.add(t);
+          break;
+        default:
+          break;
+      }
+    }
+    out.sort(Txn.compare);
+    return out;
   }
 
   // ---- 6.2 Goods taken (sell value & cost basis) ----------------------------
@@ -310,4 +384,132 @@ class Ledger {
           (category: e.key, amount: e.value),
     ];
   }
+
+  // ---- Shops (external customers) ------------------------------------------
+  //
+  // Shops are retailers who buy goods to resell. Unlike salespersons they are
+  // not tracked on credit — the app records how much each shop buys so the
+  // owner can see who buys most, who is new, and who is a reliable long-term
+  // customer. All figures below are derived from [shopPurchases].
+
+  /// Heuristic thresholds for [shopSegment]. Centralised so they are easy to
+  /// tune. Days are measured against the reference "now" passed by the caller.
+  static const int newWindowDays = 30; // still "new" within a month of joining
+  static const int inactiveDays = 90; // no purchase in this long → inactive
+  static const int loyalTenureDays = 90; // must have been a customer this long
+  static const int loyalCountMin = 5; // …and bought at least this many times
+  static const int loyalRecencyDays = 45; // …with a purchase this recent
+
+  Shop? shop(String id) {
+    for (final s in shops) {
+      if (s.id == id) return s;
+    }
+    return null;
+  }
+
+  /// A shop's purchases, oldest first.
+  List<ShopPurchase> purchasesOf(String shopId) {
+    final list =
+        shopPurchases.where((p) => p.shopId == shopId).toList()
+          ..sort(ShopPurchase.compare);
+    return list;
+  }
+
+  /// Total value a shop has ever bought.
+  int totalBought(String shopId) => shopPurchases
+      .where((p) => p.shopId == shopId)
+      .fold(0, (s, p) => s + p.amount);
+
+  /// Value a shop bought within [period].
+  int boughtInPeriod(String shopId, Period period) => shopPurchases
+      .where((p) => p.shopId == shopId && period.contains(p.date))
+      .fold(0, (s, p) => s + p.amount);
+
+  /// How many separate purchases a shop has made.
+  int purchaseCount(String shopId) =>
+      shopPurchases.where((p) => p.shopId == shopId).length;
+
+  /// Date of a shop's first purchase, or null if it has never bought.
+  String? firstPurchaseDate(String shopId) {
+    final list = purchasesOf(shopId);
+    return list.isEmpty ? null : list.first.date;
+  }
+
+  /// Date of a shop's most recent purchase, or null if it has never bought.
+  String? lastPurchaseDate(String shopId) {
+    final list = purchasesOf(shopId);
+    return list.isEmpty ? null : list.last.date;
+  }
+
+  /// Classify a shop from its buying behaviour, relative to [now] (device-local
+  /// clock). Pure function of the ledger — never stored.
+  ShopSegment shopSegment(String shopId, DateTime now) {
+    final purchases = purchasesOf(shopId);
+    final joined = shop(shopId)?.createdAt;
+
+    // Tenure: days since the relationship began (earliest of "added" and first
+    // purchase), so a back-dated first sale still counts as long tenure.
+    var startMs = joined ?? now.millisecondsSinceEpoch;
+    final firstDate = purchases.isEmpty ? null : _parseDate(purchases.first.date);
+    if (firstDate != null && firstDate.millisecondsSinceEpoch < startMs) {
+      startMs = firstDate.millisecondsSinceEpoch;
+    }
+    final tenureDays = _daysBetween(startMs, now);
+
+    if (purchases.isEmpty) {
+      // Added but never bought: new for a while, then treated as inactive.
+      return tenureDays <= newWindowDays
+          ? ShopSegment.fresh
+          : ShopSegment.inactive;
+    }
+
+    final lastDate = _parseDate(purchases.last.date);
+    final recencyDays =
+        lastDate == null ? 0 : _daysBetween(lastDate.millisecondsSinceEpoch, now);
+    final count = purchases.length;
+
+    if (recencyDays > inactiveDays) return ShopSegment.inactive;
+    if (tenureDays <= newWindowDays || count <= 1) return ShopSegment.fresh;
+    if (tenureDays >= loyalTenureDays &&
+        count >= loyalCountMin &&
+        recencyDays <= loyalRecencyDays) {
+      return ShopSegment.reliable;
+    }
+    return ShopSegment.regular;
+  }
+
+  /// Shops ranked by how much they bought in [period], descending, excluding
+  /// those with zero. Answers "who buys more".
+  List<MapEntry<Shop, int>> topShops(Period period) {
+    final ranked = shops
+        .where((s) => !s.archived)
+        .map((s) => MapEntry(s, boughtInPeriod(s.id, period)))
+        .where((e) => e.value > 0)
+        .toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return ranked;
+  }
+
+  /// The highest all-time buying value across non-archived shops (0 if none
+  /// have bought). Used to flag the top buyer(s) with a badge.
+  int get topBoughtValue {
+    var max = 0;
+    for (final s in shops) {
+      if (s.archived) continue;
+      final t = totalBought(s.id);
+      if (t > max) max = t;
+    }
+    return max;
+  }
+
+  /// Whole-days from an epoch-ms instant to [now], measured on calendar dates
+  /// (ignores time-of-day) so "today" is 0 and yesterday is 1.
+  static int _daysBetween(int fromMs, DateTime now) {
+    final from = DateTime.fromMillisecondsSinceEpoch(fromMs);
+    final a = DateTime(from.year, from.month, from.day);
+    final b = DateTime(now.year, now.month, now.day);
+    return b.difference(a).inDays;
+  }
+
+  static DateTime? _parseDate(String iso) => DateTime.tryParse(iso);
 }

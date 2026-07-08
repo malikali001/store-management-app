@@ -67,6 +67,33 @@ class TransactionLines extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+class Shops extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get ownerName => text().withDefault(const Constant(''))();
+  TextColumn get phone => text().withDefault(const Constant(''))();
+  TextColumn get address => text().withDefault(const Constant(''))();
+  TextColumn get note => text().withDefault(const Constant(''))();
+  BoolColumn get archived => boolean().withDefault(const Constant(false))();
+  IntColumn get createdAt => integer()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class ShopPurchases extends Table {
+  TextColumn get id => text()();
+  TextColumn get shopId => text()();
+  TextColumn get salespersonId => text().nullable()(); // optional staff link
+  TextColumn get date => text()(); // 'YYYY-MM-DD'
+  IntColumn get amount => integer()();
+  TextColumn get note => text().nullable()();
+  IntColumn get createdAt => integer()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DataClassName('ListEntry')
 class Lists extends Table {
   TextColumn get kind => text()(); // 'category'|'brand'|'size'|'expense_category'
@@ -91,6 +118,8 @@ class SettingsItems extends Table {
   Salespersons,
   Transactions,
   TransactionLines,
+  Shops,
+  ShopPurchases,
   Lists,
   SettingsItems,
 ])
@@ -98,7 +127,14 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  Future<void> _createShopIndexes() async {
+    await customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_purchase_shop ON shop_purchases(shop_id)');
+    await customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_purchase_date ON shop_purchases(date)');
+  }
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -115,6 +151,15 @@ class AppDatabase extends _$AppDatabase {
               'CREATE INDEX IF NOT EXISTS idx_line_product ON transaction_lines(product_id)');
           await customStatement(
               'CREATE INDEX IF NOT EXISTS idx_line_txn ON transaction_lines(transaction_id)');
+          await _createShopIndexes();
+        },
+        onUpgrade: (m, from, to) async {
+          // v2: shops (external customers) and their purchase log.
+          if (from < 2) {
+            await m.createTable(shops);
+            await m.createTable(shopPurchases);
+            await _createShopIndexes();
+          }
         },
       );
 }

@@ -117,6 +117,105 @@ class Salesperson {
       );
 }
 
+/// A shop is an external customer — a retailer that buys goods from the store
+/// to resell to end users. Distinct from a [Salesperson] (hired staff). Shops
+/// are not tracked on credit; the app records how much each shop buys so the
+/// owner can see who buys most, who is new, and who is a reliable long-term
+/// customer. See [ShopPurchase] and the analytics in the ledger.
+class Shop {
+  final String id;
+  final String name; // shop name
+  final String ownerName;
+  final String phone;
+  final String address;
+  final String note;
+  final bool archived;
+  final int createdAt; // epoch ms — also the start of the relationship
+
+  const Shop({
+    required this.id,
+    required this.name,
+    this.ownerName = '',
+    this.phone = '',
+    this.address = '',
+    this.note = '',
+    this.archived = false,
+    required this.createdAt,
+  });
+
+  Shop copyWith({
+    String? name,
+    String? ownerName,
+    String? phone,
+    String? address,
+    String? note,
+    bool? archived,
+  }) =>
+      Shop(
+        id: id,
+        name: name ?? this.name,
+        ownerName: ownerName ?? this.ownerName,
+        phone: phone ?? this.phone,
+        address: address ?? this.address,
+        note: note ?? this.note,
+        archived: archived ?? this.archived,
+        createdAt: createdAt,
+      );
+}
+
+/// One "shop bought from us" event. A simple amount + date log (no credit,
+/// no stock effect) with an optional link to the salesperson who made the sale.
+class ShopPurchase {
+  final String id;
+  final String shopId;
+  final String? salespersonId; // optional: the staff member who made the sale
+  final String date; // 'YYYY-MM-DD', local date
+  final int amount; // minor units — value the shop bought
+  final String? note;
+  final int createdAt; // epoch ms, tiebreaker for same-date ordering
+
+  const ShopPurchase({
+    required this.id,
+    required this.shopId,
+    this.salespersonId,
+    required this.date,
+    required this.amount,
+    this.note,
+    required this.createdAt,
+  });
+
+  /// Chronological comparator: by date, then createdAt.
+  static int compare(ShopPurchase a, ShopPurchase b) {
+    final d = a.date.compareTo(b.date);
+    if (d != 0) return d;
+    return a.createdAt.compareTo(b.createdAt);
+  }
+}
+
+/// How a shop is classified from its buying behaviour (not credit). Derived —
+/// never stored. See `Ledger.shopSegment`.
+enum ShopSegment {
+  /// New relationship or only a first purchase so far.
+  fresh,
+
+  /// Buys from time to time.
+  regular,
+
+  /// Long-term, buys often and recently — a dependable customer.
+  reliable,
+
+  /// Hasn't bought in a long while (or was added and never bought).
+  inactive;
+
+  /// Short human label for a badge.
+  String get label => switch (this) {
+        ShopSegment.fresh => 'New',
+        ShopSegment.regular => 'Regular',
+        ShopSegment.reliable => 'Reliable',
+        ShopSegment.inactive => 'Inactive',
+      };
+}
+
 /// One sale/return line item. Prices are snapshots taken at the moment of
 /// the transaction so editing a product later never changes history.
 class TxnLine {

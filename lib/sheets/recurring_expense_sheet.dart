@@ -107,15 +107,23 @@ class _RecurringSheetState extends ConsumerState<_RecurringSheet> {
     setState(() => _saving = true);
     final repo = ref.read(repositoryProvider);
     final date = todayIso();
-    var count = 0;
-    for (final t in widget.templates) {
-      if (!_selected.contains(t.category)) continue;
-      await repo.addExpense(
-          category: t.category, amount: t.amount, date: date, recurring: true);
-      count++;
+    final chosen = [
+      for (final t in widget.templates)
+        if (_selected.contains(t.category))
+          (category: t.category, amount: t.amount, date: date, recurring: true),
+    ];
+    try {
+      await repo.addExpensesBatch(chosen);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      showError(context, 'Could not add the expenses. Please try again.');
+      return;
     }
     if (!mounted) return;
+    final count = chosen.length;
     Navigator.pop(context);
-    showToast(context, 'Added $count recurring ${count == 1 ? 'expense' : 'expenses'}');
+    showToast(context,
+        'Added $count recurring ${count == 1 ? 'expense' : 'expenses'}');
   }
 }

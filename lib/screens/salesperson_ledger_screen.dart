@@ -8,6 +8,7 @@ import '../app/ui.dart';
 import '../data/repository.dart';
 import '../domain/ledger.dart';
 import '../domain/models.dart';
+import '../domain/period.dart';
 import '../sheets/entry_detail_sheet.dart';
 import '../sheets/payment_sheet.dart';
 import '../sheets/sale_sheet.dart';
@@ -52,7 +53,14 @@ class SalespersonLedgerScreen extends ConsumerWidget {
   Widget _buildBody(BuildContext context, WidgetRef ref, Ledger ledger) {
     final money = ref.watch(moneyProvider);
     final balance = ledger.balance(salespersonId);
-    final exists = ledger.salesperson(salespersonId) != null;
+    final sp = ledger.salesperson(salespersonId);
+    final exists = sp != null;
+
+    final goodsTaken = (sp?.opening ?? 0) + ledger.sellTaken(salespersonId);
+    final paid = ledger.paymentsBy(salespersonId);
+    final profit = ledger.recognisedProfit(salespersonId);
+    final takenThisMonth =
+        ledger.takenInPeriod(salespersonId, Period.thisMonth(DateTime.now()));
 
     final history = ledger.txns
         .where((t) =>
@@ -84,6 +92,34 @@ class SalespersonLedgerScreen extends ConsumerWidget {
                     )),
               ],
             ),
+          ),
+          if (sp != null && sp.phone.trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            AppCard(
+              child: Row(
+                children: [
+                  Icon(Icons.phone_outlined, size: 18, color: AppColors.muted),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(sp.phone.trim())),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          ResponsiveCardGrid(
+            cards: [
+              MetricCard(
+                  label: 'Goods taken', value: money.format(goodsTaken)),
+              MetricCard(label: 'Paid', value: money.format(paid)),
+              MetricCard(
+                label: 'Profit recognised',
+                value: money.format(profit),
+                valueColor: profit > 0 ? AppColors.positive : null,
+              ),
+              MetricCard(
+                  label: 'Taken · this month',
+                  value: money.format(takenThisMonth)),
+            ],
           ),
           const SizedBox(height: 12),
           Row(

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -19,13 +20,31 @@ import '../domain/models.dart';
 /// (first 6 chars of id, uppercased); date; salesperson name; line-item table
 /// (item · size, qty, unit sell, line total); sale total; then previous
 /// balance, this sale (+), new balance owed. Never shows buy price/cost.
+/// Cached PDF theme using bundled Roboto fonts.
+///
+/// The `pdf` package's built-in standard fonts (Helvetica) do not render
+/// reliably on Flutter web — the receipt comes out blank. Embedding a real
+/// TrueType font fixes this on every platform and keeps the app fully offline
+/// (the fonts ship as bundled assets, no network fetch).
+pw.ThemeData? _receiptTheme;
+
+Future<pw.ThemeData> _loadReceiptTheme() async {
+  if (_receiptTheme != null) return _receiptTheme!;
+  final regular = pw.Font.ttf(
+      await rootBundle.load('assets/fonts/Roboto-Regular.ttf'));
+  final bold =
+      pw.Font.ttf(await rootBundle.load('assets/fonts/Roboto-Bold.ttf'));
+  _receiptTheme = pw.ThemeData.withFont(base: regular, bold: bold);
+  return _receiptTheme!;
+}
+
 Future<Uint8List> buildReceiptPdf(
   Ledger ledger,
   Txn sale,
   Money money,
   StoreSettings settings,
 ) async {
-  final doc = pw.Document();
+  final doc = pw.Document(theme: await _loadReceiptTheme());
 
   final spName =
       ledger.salesperson(sale.salespersonId ?? '')?.name ?? '(former salesperson)';
