@@ -6,6 +6,7 @@ import '../app/providers.dart';
 import '../app/theme.dart';
 import '../app/ui.dart';
 import '../data/repository.dart';
+import '../domain/ledger.dart';
 import '../domain/models.dart';
 import '../security/lock_settings.dart';
 import '../services/backup.dart';
@@ -77,13 +78,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         error: (e, _) => Center(child: Text('$e')),
         data: (ledger) {
           _hydrate(ledger.settings);
-          return _buildBody(context);
+          return _buildBody(context, ledger);
         },
       ),
     );
   }
 
-  Widget _buildBody(BuildContext context) {
+  Widget _buildBody(BuildContext context, Ledger ledger) {
+    final hasData = ledger.products.isNotEmpty ||
+        ledger.salespersons.isNotEmpty ||
+        ledger.txns.isNotEmpty ||
+        ledger.shops.isNotEmpty ||
+        ledger.shopPurchases.isNotEmpty;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
       child: Column(
@@ -163,19 +169,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   label: 'Restore from backup',
                   onTap: _restore,
                 ),
-                const Divider(height: 16),
-                _actionRow(
-                  icon: Icons.auto_awesome_outlined,
-                  label: 'Load demo data',
-                  onTap: _loadDemo,
-                ),
-                const Divider(height: 16),
-                _actionRow(
-                  icon: Icons.delete_outline,
-                  label: 'Clear all data',
-                  danger: true,
-                  onTap: _clearAll,
-                ),
+                // Demo data only makes sense on a fresh, empty store — once
+                // there is real data it could only destroy it, so it is hidden.
+                if (!hasData) ...[
+                  const Divider(height: 16),
+                  _actionRow(
+                    icon: Icons.auto_awesome_outlined,
+                    label: 'Load demo data',
+                    onTap: _loadDemo,
+                  ),
+                ],
+                // Clearing everything is only offered when there is something
+                // to clear, and is guarded by a type-to-confirm step.
+                if (hasData) ...[
+                  const Divider(height: 16),
+                  _actionRow(
+                    icon: Icons.delete_outline,
+                    label: 'Clear all data',
+                    danger: true,
+                    onTap: () => _clearAll(ledger.settings.storeName),
+                  ),
+                ],
               ],
             ),
           ),
@@ -219,15 +233,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  Future<void> _clearAll() async {
-    final ok = await confirm(
-      context,
-      title: 'Clear all data',
-      message:
-          'This permanently deletes every product, salesperson, and transaction. Your store settings are kept. This cannot be undone.',
-      confirmLabel: 'Clear everything',
-      danger: true,
-    );
+  Future<void> _clearAll(String storeName) async {
+    final target = storeName.trim().isEmpty ? 'DELETE' : storeName.trim();
+    final ok = await showDialog<bool>(
+          context: context,
+          builder: (_) => _TypeToConfirmDialog(
+            title: 'Clear all data',
+            message:
+                'This permanently deletes every product, salesperson, shop and transaction. Your store settings are kept. This cannot be undone — make sure you have a backup first.',
+            confirmLabel: 'Clear everything',
+            target: target,
+            fieldLabel: 'Type "$target" to confirm',
+          ),
+        ) ??
+        false;
     if (!ok) return;
     try {
       await _repo.clearAllData();
@@ -282,6 +301,71 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A destructive-action dialog that only enables its confirm button once the
+/// user types the required [target] text. Pops true on confirm.
+class _TypeToConfirmDialog extends StatefulWidget {
+  final String title;
+  final String message;
+  final String confirmLabel;
+  final String target;
+  final String fieldLabel;
+  const _TypeToConfirmDialog({
+    required this.title,
+    required this.message,
+    required this.confirmLabel,
+    required this.target,
+    required this.fieldLabel,
+  });
+
+  @override
+  State<_TypeToConfirmDialog> createState() => _TypeToConfirmDialogState();
+}
+
+class _TypeToConfirmDialogState extends State<_TypeToConfirmDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  bool get _matches =>
+      _controller.text.trim().toLowerCase() ==
+      widget.target.trim().toLowerCase();
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(widget.message,
+              style: TextStyle(color: AppColors.muted, fontSize: 13)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(labelText: widget.fieldLabel),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel')),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+          onPressed: _matches ? () => Navigator.pop(context, true) : null,
+          child: Text(widget.confirmLabel),
+        ),
+      ],
     );
   }
 }

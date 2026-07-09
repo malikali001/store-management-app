@@ -116,6 +116,30 @@ class Ledger {
     return n;
   }
 
+  /// Net cost basis (unit_buy snapshots) of a product's units sold, less
+  /// returns. The cost of goods actually sold for this product.
+  int productCogs(String productId) {
+    var n = 0;
+    for (final t in txns) {
+      if (t.type == TxnType.sale) {
+        for (final l in t.lines) {
+          if (l.productId == productId) n += l.lineBuy;
+        }
+      } else if (t.type == TxnType.returnGoods) {
+        for (final l in t.lines) {
+          if (l.productId == productId) n -= l.lineBuy;
+        }
+      }
+    }
+    return n;
+  }
+
+  /// Gross margin realised on a product's net units sold, using the price
+  /// snapshots: salesRevenue − productCogs. (Not cash-basis profit — that is
+  /// recognised per salesperson in 6.5 — but a true per-product margin.)
+  int productGrossMargin(String productId) =>
+      salesRevenue(productId) - productCogs(productId);
+
   /// Value currently sitting as stock for one product: max(0, stock) × buy.
   int productStockValue(String productId) {
     final p = product(productId);

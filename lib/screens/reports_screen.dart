@@ -11,6 +11,7 @@ import '../domain/models.dart';
 import '../domain/period.dart';
 import '../sheets/entry_detail_sheet.dart';
 import '../services/csv_export.dart';
+import '../services/reports.dart';
 
 /// Section 7.11 — reports.
 class ReportsScreen extends ConsumerWidget {
@@ -150,7 +151,37 @@ class ReportsScreen extends ConsumerWidget {
                 ],
               ),
             ),
-          const SectionTitle('Export'),
+          const SectionTitle('Download report (PDF)'),
+          _MutedCard(
+            'Full detailed report for the selected period. Stock figures and '
+            'balances are always current.',
+          ),
+          const SizedBox(height: 8),
+          Column(
+            children: [
+              _ReportButton(
+                icon: Icons.inventory_2_outlined,
+                label: 'Products & inventory',
+                subtitle: 'Stock, prices, stock value, revenue, margin, low stock',
+                onTap: () => shareProductsReport(context, ref),
+              ),
+              const SizedBox(height: 8),
+              _ReportButton(
+                icon: Icons.storefront_outlined,
+                label: 'Shops (customers)',
+                subtitle: 'Buying totals, segments, and full purchase log',
+                onTap: () => shareShopsReport(context, ref),
+              ),
+              const SizedBox(height: 8),
+              _ReportButton(
+                icon: Icons.people_outline,
+                label: 'Salespersons',
+                subtitle: 'Goods taken, paid, owed, profit, and each ledger',
+                onTap: () => shareSalespersonsReport(context, ref),
+              ),
+            ],
+          ),
+          const SectionTitle('Export (CSV)'),
           Row(
             children: [
               Expanded(
@@ -208,6 +239,44 @@ class _MoneyRow extends StatelessWidget {
               style: tabularFigures.copyWith(
                   fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
                   color: color ?? AppColors.ink)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReportButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final VoidCallback onTap;
+  const _ReportButton({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      onTap: onTap,
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.positive),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(subtitle,
+                    style: TextStyle(color: AppColors.muted, fontSize: 12)),
+              ],
+            ),
+          ),
+          Icon(Icons.picture_as_pdf_outlined, color: AppColors.muted),
         ],
       ),
     );
