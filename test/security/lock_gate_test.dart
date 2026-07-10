@@ -22,7 +22,7 @@ void main() {
     addTearDown(db.close);
 
     // A lock is configured and switched on.
-    final service = LockService(store: FakeSecureStore());
+    final service = fakeLockService();
     await service.setPin('1234');
     expect(await service.isEnabled(), isTrue);
 
@@ -65,7 +65,7 @@ void main() {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
-    final service = LockService(store: FakeSecureStore());
+    final service = fakeLockService();
     await service.setPin('1234');
     final code = service.generateRecoveryCode();
     await service.setRecoveryCode(code);
@@ -98,5 +98,77 @@ void main() {
     // Unlocked, and the new PIN is what now verifies.
     expect(find.text('Enter your PIN'), findsNothing);
     expect(await service.verifyPin('5678'), PinResult.ok);
+  });
+
+  testWidgets('auto-locks when returning from background', (tester) async {
+    tester.view.physicalSize = const Size(1200, 2200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final service = fakeLockService();
+    await service.setPin('1234'); // auto-lock defaults to immediate (0 min)
+
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        lockServiceProvider.overrideWithValue(service),
+      ],
+      child: const StoreManagerApp(),
+    ));
+    await tester.pumpAndSettle();
+
+    // Unlock with the PIN.
+    for (final d in ['1', '2', '3', '4']) {
+      await tester.tap(find.widgetWithText(OutlinedButton, d).first);
+      await tester.pumpAndSettle();
+    }
+    expect(find.text('Enter your PIN'), findsNothing);
+
+    // Background (through the valid transition chain) then resume → re-locks.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pumpAndSettle();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(find.text('Enter your PIN'), findsOneWidget);
+  });
+
+  testWidgets('wrong PIN shows an error; Forgot-PIN with no recovery explains',
+      (tester) async {
+    tester.view.physicalSize = const Size(1200, 2200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final service = fakeLockService();
+    await service.setPin('1234'); // note: no recovery code configured
+
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        lockServiceProvider.overrideWithValue(service),
+      ],
+      child: const StoreManagerApp(),
+    ));
+    await tester.pumpAndSettle();
+
+    // A wrong PIN is rejected with a message.
+    for (final d in ['9', '9', '9', '9']) {
+      await tester.tap(find.widgetWithText(OutlinedButton, d).first);
+      await tester.pumpAndSettle();
+    }
+    expect(find.text('Wrong PIN. Try again.'), findsOneWidget);
+
+    // Forgot PIN with no recovery code set → explain, stay locked.
+    await tester.tap(find.text('Forgot PIN?'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('No recovery code'), findsWidgets);
+    expect(find.text('Enter your PIN'), findsOneWidget);
   });
 }

@@ -5,11 +5,17 @@ library;
 
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show compute;
 import 'package:local_auth/local_auth.dart';
 
 import 'lock_policy.dart';
 import 'pin.dart';
 import 'secure_store.dart';
+
+// Run the expensive PBKDF2 (120k iterations) on a background isolate so the UI
+// thread never freezes while a PIN is set or checked.
+String _hashOnIsolate(String value) => Pin.hash(value);
+bool _verifyOnIsolate((String, String) args) => Pin.verify(args.$1, args.$2);
 
 /// Result of a PIN attempt.
 enum PinResult { ok, wrong, lockedOut }
@@ -18,9 +24,27 @@ class LockService {
   final SecureStore _store;
   final LocalAuthentication _auth;
 
-  LockService({SecureStore? store, LocalAuthentication? auth})
-      : _store = store ?? SecureStore(),
-        _auth = auth ?? LocalAuthentication();
+  // PIN hashing runs on a background isolate in production (so the UI never
+  // freezes). Tests inject synchronous versions because a widget test's
+  // pumpAndSettle cannot drive a real isolate.
+  final Future<String> Function(String) _hash;
+  final Future<bool> Function(String, String) _verify;
+
+  // Injectable so tests can resolve biometric availability instantly instead of
+  // waiting on the (plugin-less) 2s timeout.
+  final Future<bool> Function()? _biometricAvailableFn;
+
+  LockService({
+    SecureStore? store,
+    LocalAuthentication? auth,
+    Future<String> Function(String)? hasher,
+    Future<bool> Function(String, String)? verifier,
+    Future<bool> Function()? biometricAvailableFn,
+  })  : _store = store ?? SecureStore(),
+        _auth = auth ?? LocalAuthentication(),
+        _hash = hasher ?? ((v) => compute(_hashOnIsolate, v)),
+        _verify = verifier ?? ((p, s) => compute(_verifyOnIsolate, (p, s))),
+        _biometricAvailableFn = biometricAvailableFn;
 
   /// Whether a PIN has ever been set (lock is available to turn on).
   Future<bool> isConfigured() async =>
@@ -43,7 +67,7 @@ class LockService {
 
   /// Set (or change) the PIN and switch the lock on. Resets failure counters.
   Future<void> setPin(String pin) async {
-    await _store.write(SecureStore.kPinHash, Pin.hash(pin));
+    await _store.write(SecureStore.kPinHash, await _hash(pin));
     await _store.write(SecureStore.kLockEnabled, '1');
     await _resetFailures();
   }
@@ -95,7 +119,7 @@ class LockService {
     if (LockPolicy.isLockedOut(attempts, last, ts)) return PinResult.lockedOut;
 
     final stored = await _store.read(SecureStore.kPinHash);
-    if (stored != null && Pin.verify(pin, stored)) {
+    if (stored != null && await _verify(pin, stored)) {
       await _resetFailures();
       return PinResult.ok;
     }
@@ -137,8 +161,8 @@ class LockService {
       (await _store.read(SecureStore.kRecoveryHash)) != null;
 
   /// Store the hash of [code]. Call with the code shown to the user at setup.
-  Future<void> setRecoveryCode(String code) => _store.write(
-      SecureStore.kRecoveryHash, Pin.hash(normaliseRecoveryCode(code)));
+  Future<void> setRecoveryCode(String code) async => _store.write(
+      SecureStore.kRecoveryHash, await _hash(normaliseRecoveryCode(code)));
 
   /// Verify a recovery [code] and, if correct, set [newPin] (keeping the lock
   /// on). Applies the same throttling as PIN entry.
@@ -151,7 +175,7 @@ class LockService {
 
     final stored = await _store.read(SecureStore.kRecoveryHash);
     if (stored != null &&
-        Pin.verify(normaliseRecoveryCode(code), stored)) {
+        await _verify(normaliseRecoveryCode(code), stored)) {
       await setPin(newPin); // sets new PIN, keeps lock on, resets failures
       return PinResult.ok;
     }
@@ -161,9 +185,13 @@ class LockService {
 
   // ---- Biometrics ----------------------------------------------------------
 
-  /// True if the device has enrolled biometrics we can use. Bounded by a short
-  /// timeout so a wedged/absent biometric API can never freeze the UI.
-  Future<bool> biometricAvailable() async {
+  /// True if the device has enrolled biometrics we can use.
+  Future<bool> biometricAvailable() =>
+      _biometricAvailableFn?.call() ?? _realBiometricAvailable();
+
+  /// Bounded by a short timeout so a wedged/absent biometric API can never
+  /// freeze the UI.
+  Future<bool> _realBiometricAvailable() async {
     const t = Duration(seconds: 2);
     try {
       final supported =

@@ -22,11 +22,14 @@ typedef _Builder = Future<Uint8List> Function(
 Future<void> _generate(BuildContext context, WidgetRef ref, String filename,
     _Builder build) async {
   try {
-    // Load a fresh ledger so the report reflects the very latest data.
-    final ledger = await ref.read(repositoryProvider).loadLedger();
-    final money = Money(ledger.settings);
-    final period = ref.read(periodProvider);
-    final bytes = await build(ledger, money, ledger.settings, period);
+    final bytes = await runWithProgress(context, 'Generating report…', () async {
+      // Load a fresh ledger so the report reflects the very latest data.
+      final ledger = await ref.read(repositoryProvider).loadLedger();
+      final money = Money(ledger.settings);
+      final period = ref.read(periodProvider);
+      return build(ledger, money, ledger.settings, period);
+    });
+    if (!context.mounted) return;
     await Printing.sharePdf(bytes: bytes, filename: filename);
   } catch (e) {
     if (context.mounted) {

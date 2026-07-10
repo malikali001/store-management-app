@@ -293,3 +293,48 @@ Future<bool> confirm(BuildContext context,
   );
   return res ?? false;
 }
+
+/// Runs [task] behind a blocking, non-dismissible "working" dialog so a slow
+/// operation (building a PDF/CSV, backup/restore) shows clear progress instead
+/// of looking frozen. The modal barrier also prevents double-taps. The dialog
+/// is always dismissed, even if [task] throws (the error propagates to the
+/// caller). Returns the task's result.
+Future<T> runWithProgress<T>(
+  BuildContext context,
+  String message,
+  Future<T> Function() task,
+) async {
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    useRootNavigator: true,
+    builder: (_) => PopScope(
+      canPop: false,
+      child: Dialog(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.5)),
+              const SizedBox(width: 16),
+              Flexible(child: Text(message)),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+  try {
+    // Let the dialog paint one frame before we start (possibly heavy) work.
+    await WidgetsBinding.instance.endOfFrame;
+    return await task();
+  } finally {
+    if (context.mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+  }
+}

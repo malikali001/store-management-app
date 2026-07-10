@@ -13,16 +13,19 @@ import 'share/share_bytes.dart';
 
 const _converter = ListToCsvConverter();
 
-/// Builds CSV from [rows] and shares it as [filename].
+/// Builds CSV from [buildRows] (behind a progress dialog) and shares it.
 Future<void> _shareCsv(
   BuildContext context,
   String filename,
-  List<List<Object?>> rows,
+  List<List<Object?>> Function() buildRows,
 ) async {
   try {
-    final csv = _converter.convert(rows);
-    await shareBytes(
-        Uint8List.fromList(utf8.encode(csv)), filename, 'text/csv');
+    final bytes = await runWithProgress(context, 'Preparing CSV…', () async {
+      final csv = _converter.convert(buildRows());
+      return Uint8List.fromList(utf8.encode(csv));
+    });
+    if (!context.mounted) return;
+    await shareBytes(bytes, filename, 'text/csv');
   } catch (e) {
     if (context.mounted) {
       showError(context, 'Could not export the file. Please try again.');
@@ -39,22 +42,24 @@ Future<void> exportProductsCsv(BuildContext context, WidgetRef ref) async {
   }
   final money = ref.read(moneyProvider);
 
-  final rows = <List<Object?>>[
-    ['Code', 'Name', 'Brand', 'Category', 'Size', 'Buy', 'Sell', 'Stock'],
-  ];
-  for (final p in ledger.products) {
-    rows.add([
-      p.code,
-      p.name,
-      p.brand,
-      p.category,
-      p.size,
-      money.editValue(p.buyPrice),
-      money.editValue(p.sellPrice),
-      ledger.stock(p.id),
-    ]);
-  }
-  await _shareCsv(context, 'products-${todayIso()}.csv', rows);
+  await _shareCsv(context, 'products-${todayIso()}.csv', () {
+    final rows = <List<Object?>>[
+      ['Code', 'Name', 'Brand', 'Category', 'Size', 'Buy', 'Sell', 'Stock'],
+    ];
+    for (final p in ledger.products) {
+      rows.add([
+        p.code,
+        p.name,
+        p.brand,
+        p.category,
+        p.size,
+        money.editValue(p.buyPrice),
+        money.editValue(p.sellPrice),
+        ledger.stock(p.id),
+      ]);
+    }
+    return rows;
+  });
 }
 
 /// Salespersons: name, goods taken (incl. opening), paid, owed, profit recognised.
@@ -66,20 +71,22 @@ Future<void> exportSalespersonsCsv(BuildContext context, WidgetRef ref) async {
   }
   final money = ref.read(moneyProvider);
 
-  final rows = <List<Object?>>[
-    ['Name', 'Goods taken', 'Paid', 'Owed', 'Profit recognised'],
-  ];
-  for (final s in ledger.salespersons) {
-    final goodsTaken = s.opening + ledger.sellTaken(s.id);
-    rows.add([
-      s.name,
-      money.editValue(goodsTaken),
-      money.editValue(ledger.paymentsBy(s.id)),
-      money.editValue(ledger.balance(s.id)),
-      money.editValue(ledger.recognisedProfit(s.id)),
-    ]);
-  }
-  await _shareCsv(context, 'salespersons-${todayIso()}.csv', rows);
+  await _shareCsv(context, 'salespersons-${todayIso()}.csv', () {
+    final rows = <List<Object?>>[
+      ['Name', 'Goods taken', 'Paid', 'Owed', 'Profit recognised'],
+    ];
+    for (final s in ledger.salespersons) {
+      final goodsTaken = s.opening + ledger.sellTaken(s.id);
+      rows.add([
+        s.name,
+        money.editValue(goodsTaken),
+        money.editValue(ledger.paymentsBy(s.id)),
+        money.editValue(ledger.balance(s.id)),
+        money.editValue(ledger.recognisedProfit(s.id)),
+      ]);
+    }
+    return rows;
+  });
 }
 
 /// Transactions: date, type, salesperson, detail, money-in, money-out.
@@ -120,11 +127,12 @@ Future<void> exportTransactionsCsv(BuildContext context, WidgetRef ref) async {
         TxnType.expense => 'Expense',
       };
 
-  final rows = <List<Object?>>[
-    ['Date', 'Type', 'Salesperson', 'Detail', 'Money in', 'Money out'],
-  ];
+  await _shareCsv(context, 'transactions-${todayIso()}.csv', () {
+    final rows = <List<Object?>>[
+      ['Date', 'Type', 'Salesperson', 'Detail', 'Money in', 'Money out'],
+    ];
 
-  for (final t in txns) {
+    for (final t in txns) {
     String detail = '';
     String moneyIn = '';
     String moneyOut = '';
@@ -160,7 +168,8 @@ Future<void> exportTransactionsCsv(BuildContext context, WidgetRef ref) async {
       moneyIn,
       moneyOut,
     ]);
-  }
+    }
 
-  await _shareCsv(context, 'transactions-${todayIso()}.csv', rows);
+    return rows;
+  });
 }

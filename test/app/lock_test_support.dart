@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:store_manager/security/lock_controller.dart';
 import 'package:store_manager/security/lock_service.dart';
+import 'package:store_manager/security/pin.dart';
 import 'package:store_manager/security/secure_store.dart';
 
 /// In-memory secure store so widget tests never touch the platform keystore
@@ -18,7 +19,17 @@ class FakeSecureStore extends SecureStore {
   Future<void> delete(String key) async => _m.remove(key);
 }
 
-/// Provider override that runs the app lock against an in-memory store (lock is
+/// A LockService for tests: in-memory store plus SYNCHRONOUS PIN hashing.
+/// Production offloads PBKDF2 to an isolate via compute(), but a widget test's
+/// pumpAndSettle cannot drive a real isolate, so tests run it inline.
+LockService fakeLockService() => LockService(
+      store: FakeSecureStore(),
+      hasher: (v) async => Pin.hash(v),
+      verifier: (p, s) async => Pin.verify(p, s),
+      biometricAvailableFn: () async => false,
+    );
+
+/// Provider override that runs the app lock against the test service (lock is
 /// simply off unless a test opts in), keeping the app fully rendered in tests.
 Override lockTestOverride() =>
-    lockServiceProvider.overrideWithValue(LockService(store: FakeSecureStore()));
+    lockServiceProvider.overrideWithValue(fakeLockService());

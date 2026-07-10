@@ -282,9 +282,15 @@ class _NewPinSheetState extends State<_NewPinSheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SheetHeader('Choose a PIN'),
-        _PinField(controller: _first, label: 'New PIN'),
+        _PinField(
+            controller: _first,
+            label: 'New PIN',
+            fieldKey: const Key('new_pin')),
         const SizedBox(height: 12),
-        _PinField(controller: _second, label: 'Confirm PIN'),
+        _PinField(
+            controller: _second,
+            label: 'Confirm PIN',
+            fieldKey: const Key('confirm_pin')),
         if (_error != null) ...[
           const SizedBox(height: 8),
           Text(_error!, style: TextStyle(color: AppColors.danger, fontSize: 13)),
@@ -318,7 +324,8 @@ class _PinEntrySheetState extends State<_PinEntrySheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SheetHeader(widget.title),
-        _PinField(controller: _c, label: 'PIN'),
+        _PinField(
+            controller: _c, label: 'PIN', fieldKey: const Key('current_pin')),
         const SizedBox(height: 20),
         FilledButton(
           onPressed: () => Navigator.pop(context, _c.text.trim()),
@@ -332,11 +339,13 @@ class _PinEntrySheetState extends State<_PinEntrySheet> {
 class _PinField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
-  const _PinField({required this.controller, required this.label});
+  final Key? fieldKey;
+  const _PinField({required this.controller, required this.label, this.fieldKey});
 
   @override
   Widget build(BuildContext context) {
     return TextField(
+      key: fieldKey,
       controller: controller,
       obscureText: true,
       keyboardType: TextInputType.number,

@@ -12,8 +12,14 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:flutter/foundation.dart' show compute;
 
 import '../security/pin.dart';
+
+// Derive the key on a background isolate — PBKDF2 (120k iterations) would
+// otherwise freeze the UI thread during backup/restore.
+Uint8List _deriveKey((String, List<int>, int) a) =>
+    Pin.pbkdf2(utf8.encode(a.$1), a.$2, a.$3, 32);
 
 /// Thrown when decryption fails — wrong password or a corrupted/tampered file.
 class BackupPasswordError implements Exception {
@@ -37,7 +43,7 @@ bool isEncryptedBackup(Map<String, dynamic> json) =>
 Future<Map<String, dynamic>> encryptBackup(
     String plaintextJson, String passphrase) async {
   final salt = _randomBytes(_kSaltLen);
-  final keyBytes = Pin.pbkdf2(utf8.encode(passphrase), salt, _kIterations, 32);
+  final keyBytes = await compute(_deriveKey, (passphrase, salt, _kIterations));
   final algo = AesGcm.with256bits();
   final secretKey = await algo.newSecretKeyFromBytes(keyBytes);
   final nonce = _randomBytes(_kNonceLen);
@@ -69,8 +75,7 @@ Future<String> decryptBackup(
     final nonce = base64.decode(json['nonce'] as String);
     final cipher = base64.decode(json['ciphertext'] as String);
     final mac = base64.decode(json['mac'] as String);
-    final keyBytes =
-        Pin.pbkdf2(utf8.encode(passphrase), salt, iterations, 32);
+    final keyBytes = await compute(_deriveKey, (passphrase, salt, iterations));
     final algo = AesGcm.with256bits();
     final secretKey = await algo.newSecretKeyFromBytes(keyBytes);
     final clear = await algo.decrypt(

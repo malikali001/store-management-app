@@ -21,18 +21,21 @@ import 'share/share_bytes.dart';
 Future<void> backupToFile(BuildContext context, WidgetRef ref) async {
   final repo = ref.read(repositoryProvider);
   try {
-    final json = await repo.exportBackup();
-    if (!context.mounted) return;
     // Optionally protect the shared file with a password.
     final password = await _promptSetBackupPassword(context);
     if (password == null) return; // cancelled
-    final payload = password.isEmpty
-        ? json
-        : await encryptBackup(jsonEncode(json), password);
-    final str = const JsonEncoder.withIndent('  ').convert(payload);
+    if (!context.mounted) return;
+    final bytes = await runWithProgress(context, 'Preparing backup…', () async {
+      final json = await repo.exportBackup();
+      final payload = password.isEmpty
+          ? json
+          : await encryptBackup(jsonEncode(json), password);
+      final str = const JsonEncoder.withIndent('  ').convert(payload);
+      return Uint8List.fromList(utf8.encode(str));
+    });
+    if (!context.mounted) return;
     final filename = 'store-backup-${todayIso()}.json';
-    final shared = await shareBytes(
-        Uint8List.fromList(utf8.encode(str)), filename, 'application/json');
+    final shared = await shareBytes(bytes, filename, 'application/json');
     // Only record a successful off-device backup (drives the staleness nudge).
     // If the user dismissed the share sheet the data never left the device, so
     // we must keep nudging.
@@ -134,9 +137,10 @@ Future<void> restoreFromFile(BuildContext context, WidgetRef ref) async {
     danger: true,
   );
   if (!ok) return;
+  if (!context.mounted) return;
 
   try {
-    await repo.restoreBackup(data);
+    await runWithProgress(context, 'Restoring…', () => repo.restoreBackup(data));
     if (context.mounted) {
       showToast(context, 'Backup restored.');
     }

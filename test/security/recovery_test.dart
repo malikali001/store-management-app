@@ -5,7 +5,7 @@ import '../app/lock_test_support.dart';
 
 void main() {
   group('recovery code generation', () {
-    final svc = LockService(store: FakeSecureStore());
+    final svc = fakeLockService();
 
     test('is formatted in three groups and uses an unambiguous alphabet', () {
       final code = svc.generateRecoveryCode();
@@ -34,7 +34,7 @@ void main() {
     late String code;
 
     setUp(() async {
-      svc = LockService(store: FakeSecureStore());
+      svc = fakeLockService();
       await svc.setPin('1111');
       code = svc.generateRecoveryCode();
       await svc.setRecoveryCode(code);
