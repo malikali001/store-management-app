@@ -16,8 +16,7 @@ import '../domain/models.dart';
 import '../domain/period.dart';
 import 'report_pdf.dart';
 
-typedef _Builder = Future<Uint8List> Function(
-    Ledger, Money, StoreSettings, Period);
+typedef _Builder = Future<Uint8List> Function(Ledger, StoreSettings, Period);
 
 Future<void> _generate(BuildContext context, WidgetRef ref, String filename,
     _Builder build) async {
@@ -25,9 +24,8 @@ Future<void> _generate(BuildContext context, WidgetRef ref, String filename,
     final bytes = await runWithProgress(context, 'Generating report…', () async {
       // Load a fresh ledger so the report reflects the very latest data.
       final ledger = await ref.read(repositoryProvider).loadLedger();
-      final money = Money(ledger.settings);
       final period = ref.read(periodProvider);
-      return build(ledger, money, ledger.settings, period);
+      return build(ledger, ledger.settings, period);
     });
     if (!context.mounted) return;
     await Printing.sharePdf(bytes: bytes, filename: filename);

@@ -8,6 +8,7 @@ import 'package:store_manager/data/database.dart' hide Product, Salesperson;
 import 'package:store_manager/data/repository.dart';
 import 'package:store_manager/main.dart';
 import 'package:store_manager/screens/settings_screen.dart';
+import 'package:store_manager/services/report_pdf.dart';
 
 import 'lock_test_support.dart';
 
@@ -16,6 +17,9 @@ import 'lock_test_support.dart';
 /// and the app handles them gracefully — but the build logic (PDF, CSV rows,
 /// backup JSON, progress dialog) all runs and gets covered.
 void main() {
+  // Reports build inline so pumpAndSettle can drive them (no background isolate).
+  debugBuildReportsInline = true;
+
   void bigSurface(WidgetTester tester) {
     tester.view.physicalSize = const Size(1400, 4200);
     tester.view.devicePixelRatio = 1.0;

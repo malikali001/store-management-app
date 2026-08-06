@@ -13,6 +13,7 @@ library;
 
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show compute;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
@@ -21,6 +22,78 @@ import '../domain/ledger.dart';
 import '../domain/models.dart';
 import '../domain/period.dart';
 import 'pdf_theme.dart';
+
+/// Everything a report-building isolate needs. All fields are sendable (plain
+/// data + font bytes); [Money] is rebuilt from [settings] inside the isolate.
+class _ReportJob {
+  final Ledger ledger;
+  final StoreSettings settings;
+  final Period period;
+  final int generatedMs;
+  final Uint8List reg;
+  final Uint8List bold;
+  const _ReportJob(
+      this.ledger, this.settings, this.period, this.generatedMs, this.reg, this.bold);
+
+  DateTime get now => DateTime.fromMillisecondsSinceEpoch(generatedMs);
+  Money get money => Money(settings);
+  pw.ThemeData get theme => pdfThemeFromBytes(reg, bold);
+}
+
+// ---- Public entry points: build each report on a background isolate so the
+// UI thread never freezes during PDF layout. ------------------------------
+
+/// Test seam: when true, reports build inline (no isolate) so widget tests can
+/// drive them with pumpAndSettle and coverage can see the build code. Always
+/// false in production, where PDF layout must stay off the UI thread.
+bool debugBuildReportsInline = false;
+
+Future<Uint8List> _dispatch(
+    Future<Uint8List> Function(_ReportJob) job, _ReportJob arg) {
+  return debugBuildReportsInline ? job(arg) : compute(job, arg);
+}
+
+Future<Uint8List> buildProductsReportPdf(
+  Ledger ledger,
+  StoreSettings settings,
+  Period period, {
+  DateTime? generatedAt,
+}) async {
+  final (reg, bold) = await loadPdfFonts();
+  return _dispatch(_productsJob,
+      _ReportJob(ledger, settings, period, _ms(generatedAt), reg, bold));
+}
+
+Future<Uint8List> buildShopsReportPdf(
+  Ledger ledger,
+  StoreSettings settings,
+  Period period, {
+  DateTime? generatedAt,
+}) async {
+  final (reg, bold) = await loadPdfFonts();
+  return _dispatch(_shopsJob,
+      _ReportJob(ledger, settings, period, _ms(generatedAt), reg, bold));
+}
+
+Future<Uint8List> buildSalespersonsReportPdf(
+  Ledger ledger,
+  StoreSettings settings,
+  Period period, {
+  DateTime? generatedAt,
+}) async {
+  final (reg, bold) = await loadPdfFonts();
+  return _dispatch(_salespersonsJob,
+      _ReportJob(ledger, settings, period, _ms(generatedAt), reg, bold));
+}
+
+int _ms(DateTime? d) => (d ?? DateTime.now()).millisecondsSinceEpoch;
+
+Future<Uint8List> _productsJob(_ReportJob j) => _productsDoc(
+    j.ledger, j.money, j.settings, j.period, j.now, j.theme);
+Future<Uint8List> _shopsJob(_ReportJob j) =>
+    _shopsDoc(j.ledger, j.money, j.settings, j.period, j.now, j.theme);
+Future<Uint8List> _salespersonsJob(_ReportJob j) => _salespersonsDoc(
+    j.ledger, j.money, j.settings, j.period, j.now, j.theme);
 
 const _green = PdfColor.fromInt(0xFF157A5E);
 const _ink = PdfColor.fromInt(0xFF1C211F);
@@ -146,15 +219,15 @@ String _itemLabel(Ledger l, String productId) {
 
 // ---- 1. Products & inventory ------------------------------------------------
 
-Future<Uint8List> buildProductsReportPdf(
+Future<Uint8List> _productsDoc(
   Ledger ledger,
   Money money,
   StoreSettings settings,
-  Period period, {
-  DateTime? generatedAt,
-}) async {
-  final now = generatedAt ?? DateTime.now();
-  final doc = pw.Document(theme: await loadPdfTheme());
+  Period period,
+  DateTime now,
+  pw.ThemeData theme,
+) async {
+  final doc = pw.Document(theme: theme);
 
   final active = ledger.products.where((p) => !p.archived).toList()
     ..sort((a, b) {
@@ -217,17 +290,14 @@ Future<Uint8List> buildProductsReportPdf(
         money.format(margin),
       ]);
     }
-    productSections.add(pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        _sectionTitle('$cat  (${byCat[cat]!.length})'),
-        _table(headers, rows, rightCols: rightCols, footer: [
-          'Subtotal', '', '', '', '', formatQty(cUnits),
-          money.format(cStockValue), '', money.format(cRevenue),
-          money.format(cMargin),
-        ]),
-      ],
-    ));
+    // Add the title and table as SEPARATE top-level widgets (not wrapped in a
+    // Column) so MultiPage can split a long category table across pages.
+    productSections.add(_sectionTitle('$cat  (${byCat[cat]!.length})'));
+    productSections.add(_table(headers, rows, rightCols: rightCols, footer: [
+      'Subtotal', '', '', '', '', formatQty(cUnits),
+      money.format(cStockValue), '', money.format(cRevenue),
+      money.format(cMargin),
+    ]));
   }
 
   final lowItems = ledger.lowStockProducts()
@@ -281,15 +351,15 @@ Future<Uint8List> buildProductsReportPdf(
 
 // ---- 2. Shops (external customers) ------------------------------------------
 
-Future<Uint8List> buildShopsReportPdf(
+Future<Uint8List> _shopsDoc(
   Ledger ledger,
   Money money,
   StoreSettings settings,
-  Period period, {
-  DateTime? generatedAt,
-}) async {
-  final now = generatedAt ?? DateTime.now();
-  final doc = pw.Document(theme: await loadPdfTheme());
+  Period period,
+  DateTime now,
+  pw.ThemeData theme,
+) async {
+  final doc = pw.Document(theme: theme);
 
   final active = ledger.shops.where((s) => !s.archived).toList()
     ..sort((a, b) =>
@@ -379,15 +449,15 @@ Future<Uint8List> buildShopsReportPdf(
 
 // ---- 3. Salespersons --------------------------------------------------------
 
-Future<Uint8List> buildSalespersonsReportPdf(
+Future<Uint8List> _salespersonsDoc(
   Ledger ledger,
   Money money,
   StoreSettings settings,
-  Period period, {
-  DateTime? generatedAt,
-}) async {
-  final now = generatedAt ?? DateTime.now();
-  final doc = pw.Document(theme: await loadPdfTheme());
+  Period period,
+  DateTime now,
+  pw.ThemeData theme,
+) async {
+  final doc = pw.Document(theme: theme);
 
   final people = [...ledger.salespersons]
     ..sort((a, b) => ledger.balance(b.id).compareTo(ledger.balance(a.id)));
@@ -466,20 +536,17 @@ Future<Uint8List> buildSalespersonsReportPdf(
       }
     }
 
-    detailSections.add(pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        _sectionTitle('${s.name} — balance owed ${money.format(ledger.balance(s.id))}'),
-        if (detailRows.isEmpty)
-          _muteNote('No movements yet.')
-        else
-          _table(
+    // Title and table as separate top-level widgets so a long per-person
+    // movement table can split across pages (a wrapping Column cannot).
+    detailSections.add(_sectionTitle(
+        '${s.name} — balance owed ${money.format(ledger.balance(s.id))}'));
+    detailSections.add(detailRows.isEmpty
+        ? _muteNote('No movements yet.')
+        : _table(
             const ['Date', 'Type', 'Detail', 'Amount'],
             detailRows,
             rightCols: {3},
-          ),
-      ],
-    ));
+          ));
   }
 
   doc.addPage(pw.MultiPage(
