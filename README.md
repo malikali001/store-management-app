@@ -23,24 +23,45 @@ profit figure is calculated automatically.
 | Money | Take goods **on credit**, owe a balance, pay back | A simple **purchase log** — no credit |
 | Shows | Stock, cash, owed, profit | Who buys most / newest / most loyal |
 
-Both live under the **People** tab as two segments.
+Staff are the **People** tab. Shops have their own page, opened from the **Customers** section
+on Home.
 
 ## The app at a glance
 
 ```mermaid
 flowchart LR
-    Home["🏠 Home<br/>dashboard + quick actions"]
+    Home["🏠 Home<br/>dashboard + insights"]
     Products["📦 Products<br/>catalog & stock"]
     Sales["🧾 Sales<br/>sales, returns, receipts"]
-    People["👥 People<br/>Shops · Staff"]
+    People["👥 People<br/>staff & balances"]
     Reports["📊 Reports<br/>money, rankings, CSV"]
+    Shops["🏪 Shops<br/>customers + insights"]
 
     Home --- Products --- Sales --- People --- Reports
+    Home -.->|"Customers → See all"| Shops
 ```
+
+Home leads with the money cards, then quick actions, the top 3 salespersons, and the two
+insight summaries below. Each section has a **See all** for the full list.
 
 Five movements drive everything: **Stock in** (stock ↑, cash ↓), **Sale** (stock ↓, owed ↑),
 **Return** (stock ↑, owed ↓), **Payment** (cash ↑, owed ↓, profit recognised), and **Expense**
 (cash ↓). Shop purchases are a separate customer log and don't touch these figures.
+
+## Insights
+
+Two ranking screens that turn the ledger into buying and stocking decisions. Both are derived
+on the fly, so deleting an entry corrects them immediately.
+
+- **Product insights** — fast movers · best sellers · most profit · best margin · trending up ·
+  restock soon · slow movers · thin margin.
+- **Customer insights** — top buyers · most orders · biggest orders · buying more · buying less ·
+  gone quiet · never bought.
+
+One lens at a time, with a period selector (month / quarter / all time) and a plain-language note
+saying what each figure was measured over. Because a shop purchase records only an amount and a
+date, the customer lenses cover revenue and timing — there is no per-shop cost, so no shop margin
+or profit.
 
 ## Architecture
 
@@ -59,7 +80,8 @@ flowchart TD
 ```
 
 - **Data** (`lib/data/`) — Drift tables and repository.
-- **Domain** (`lib/domain/`) — pure Dart models and every stock/money/profit formula; fully unit-tested.
+- **Domain** (`lib/domain/`) — pure Dart models and every stock/money/profit formula, plus the
+  ranking lenses (`product_insights.dart`, `shop_insights.dart`); fully unit-tested.
 - **Presentation** (`lib/screens/`, `lib/sheets/`) — providers expose derived values; widgets render them.
 
 ## Tech stack
@@ -71,12 +93,15 @@ biometric app lock with password-protected backups.
 
 ```bash
 flutter pub get
-dart run build_runner build --force-jit   # generate Drift code
-flutter run -d chrome                      # web is the primary local target
+dart run build_runner build --force-jit    # generate Drift code
+flutter run -d chrome --release            # web is the primary local target
 flutter test
 ```
 
 Fresh installs start empty — use **Settings → Load demo data** to explore.
+
+Prefer `--release` on web unless you need hot reload: a debug web build loads ~1,200 separate
+modules before the first frame, so it can sit on the "Starting…" splash for a long while.
 
 ## Building
 
