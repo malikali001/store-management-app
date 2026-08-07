@@ -41,11 +41,9 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// Opens the People tab and selects the Staff (salespersons) segment.
+  /// Opens the People tab, which lists the salespersons (staff).
   Future<void> goStaff(WidgetTester tester) async {
     await goTab(tester, 'People');
-    await tester.tap(find.text('Staff'));
-    await tester.pumpAndSettle();
   }
 
   // ---- EDIT ---------------------------------------------------------------

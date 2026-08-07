@@ -51,9 +51,6 @@ void main() {
     await pumpApp(tester);
     await tester.tap(find.text('People'));
     await tester.pumpAndSettle();
-    // People leads with the Shops segment; switch to Staff for salespersons.
-    await tester.tap(find.text('Staff'));
-    await tester.pumpAndSettle();
     // Tap the first salesperson row (seeded data has Rahul/Amir/Sana).
     await tester.tap(find.text('Amir').first);
     await tester.pumpAndSettle();

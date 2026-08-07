@@ -18,6 +18,12 @@ import 'services/backup.dart';
 import 'services/backup_status.dart';
 import 'sheets/recurring_expense_sheet.dart';
 
+/// How long startup waits for the local database to become usable before giving
+/// up and showing the startup error screen. Generous enough for a cold wasm/OPFS
+/// open on a slow device, short enough that the user is never left staring at a
+/// blank screen.
+const startupDatabaseTimeout = Duration(seconds: 20);
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -33,11 +39,17 @@ Future<void> main() async {
   try {
     db = AppDatabase();
     // Ensure sensible default settings exist on first run.
-    await StoreRepository(db).seedIfEmpty();
+    //
+    // The timeout matters as much as the try/catch: opening the database can
+    // *stall* rather than fail (on web the wasm worker handshake can hang), and
+    // without a deadline `runApp` would never be reached — leaving a blank white
+    // screen with nothing to explain it. Bounding it turns a hang into the same
+    // plain-language error screen as an outright failure.
+    await StoreRepository(db).seedIfEmpty().timeout(startupDatabaseTimeout);
   } catch (e) {
-    // The local database could not be opened (e.g. a corrupt file on native, or
-    // missing sqlite/worker assets on web). Show a plain-language screen rather
-    // than a silent blank page.
+    // The local database could not be opened or took too long (e.g. a corrupt
+    // file on native, or missing/stalled sqlite worker assets on web). Show a
+    // plain-language screen rather than a silent blank page.
     runApp(const _StartupErrorApp());
     return;
   }
@@ -106,8 +118,6 @@ class RootShell extends ConsumerStatefulWidget {
 }
 
 class _RootShellState extends ConsumerState<RootShell> {
-  int _index = 0;
-
   static const _tabs = [
     HomeScreen(),
     ProductsScreen(),
@@ -157,11 +167,14 @@ class _RootShellState extends ConsumerState<RootShell> {
 
   @override
   Widget build(BuildContext context) {
+    // The selected tab lives in a provider so other screens can navigate here
+    // (see [selectedTabProvider]).
+    final index = ref.watch(selectedTabProvider);
     return Scaffold(
-      body: IndexedStack(index: _index, children: _tabs),
+      body: IndexedStack(index: index, children: _tabs),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _index,
-        onTap: (i) => setState(() => _index = i),
+        currentIndex: index,
+        onTap: (i) => ref.read(selectedTabProvider.notifier).state = i,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.inventory_2_outlined), activeIcon: Icon(Icons.inventory_2), label: 'Products'),

@@ -10,6 +10,51 @@ import '../app/theme.dart';
 import 'lock_controller.dart';
 import 'lock_screen.dart';
 
+/// Identifies the privacy overlay that hides the ledger in the OS app switcher,
+/// so tests can assert it appears only when it should.
+const privacyObscureKey = Key('privacy_obscure');
+
+/// Shown while the initial "is the lock on?" check resolves, and on web for as
+/// long as the app bundle is still loading.
+///
+/// Deliberately **static** — no spinner. A perpetual animation would stop
+/// `pumpAndSettle` from ever settling in widget tests. But it must not be a bare
+/// coloured box either: a featureless screen is indistinguishable from a crashed
+/// one, and startup can take a while on a cold start (tens of seconds for a
+/// debug web build). The name and mark make "starting" legible.
+class _Splash extends StatelessWidget {
+  const _Splash();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: AppColors.background,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.storefront, size: 44, color: AppColors.positive),
+            SizedBox(height: 14),
+            Text(
+              'Store Manager',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+                color: AppColors.ink,
+              ),
+            ),
+            SizedBox(height: 6),
+            Text(
+              'Starting…',
+              style: TextStyle(fontSize: 13, color: AppColors.muted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class LockGate extends ConsumerStatefulWidget {
   final Widget child;
   const LockGate({super.key, required this.child});
@@ -38,12 +83,24 @@ class _LockGateState extends ConsumerState<LockGate>
   @override
   void didChangeAppLifecycleState(AppLifecycleState st) {
     final lock = ref.read(lockControllerProvider);
-    // Obscure content in the app switcher while not in the foreground.
-    final obscure = st != AppLifecycleState.resumed;
+
+    // "Actually leaving the foreground", as opposed to a momentary loss of
+    // focus. `inactive` is NOT included on purpose: it also fires while the user
+    // is still looking at the app — another window takes focus, a permission
+    // dialog opens, the notification shade is pulled down, a browser tab loses
+    // focus — and obscuring then blanks the entire app in front of them.
+    final leaving =
+        st == AppLifecycleState.paused || st == AppLifecycleState.hidden;
+
+    // The privacy screen hides the ledger in the OS app switcher. It is part of
+    // the app lock, so it only applies when the lock is switched on — with no
+    // PIN set there is nothing to protect, and blanking the UI would only ever
+    // look like a crash.
+    final obscure = lock.enabled && leaving;
     if (obscure != _obscured) setState(() => _obscured = obscure);
 
     if (!lock.enabled) return;
-    if (st == AppLifecycleState.paused || st == AppLifecycleState.hidden) {
+    if (leaving) {
       _backgroundedAt = DateTime.now();
     } else if (st == AppLifecycleState.resumed) {
       _maybeRelock();
@@ -67,11 +124,7 @@ class _LockGateState extends ConsumerState<LockGate>
 
     // Until the initial check completes, show a neutral splash (avoids a flash
     // of the home screen before we know whether to lock).
-    if (!lock.ready) {
-      // Static splash (no perpetual animation) while the initial lock check
-      // resolves — kept deliberately plain so it settles cleanly in tests.
-      return const ColoredBox(color: AppColors.background);
-    }
+    if (!lock.ready) return const _Splash();
 
     return Stack(
       children: [
@@ -79,6 +132,7 @@ class _LockGateState extends ConsumerState<LockGate>
         if (lock.locked) const Positioned.fill(child: LockScreen()),
         if (_obscured && !lock.locked)
           const Positioned.fill(
+            key: privacyObscureKey,
             child: ColoredBox(color: AppColors.background),
           ),
       ],

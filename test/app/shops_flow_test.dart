@@ -8,6 +8,7 @@ import 'package:store_manager/data/database.dart' hide Product, Salesperson, Sho
 import 'package:store_manager/data/repository.dart';
 import 'package:store_manager/domain/models.dart' show Shop;
 import 'package:store_manager/main.dart';
+import 'package:store_manager/screens/home_screen.dart' show seeAllCustomersKey;
 
 import 'lock_test_support.dart';
 
@@ -36,14 +37,25 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
   }
 
+  /// Shops live on their own page now, opened from the Customers section on the
+  /// Home dashboard (the People tab is salespersons only).
+  Future<void> goShops(WidgetTester tester) async {
+    await tester.scrollUntilVisible(
+      find.text('Customers'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(seeAllCustomersKey));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('add a shop, record a purchase, and see it reflected',
       (tester) async {
     bigSurface(tester);
     final db = await pumpApp(tester);
 
-    // People tab defaults to Shops.
-    await tester.tap(find.text('People'));
-    await tester.pumpAndSettle();
+    await goShops(tester);
     expect(find.textContaining('No shops yet'), findsOneWidget);
 
     // Add a shop.
@@ -81,8 +93,7 @@ void main() {
     await repo.upsertShop(Shop(id: 's2', name: 'Beta Bazaar', createdAt: now));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('People'));
-    await tester.pumpAndSettle();
+    await goShops(tester);
     expect(find.text('Alpha Store'), findsWidgets);
     expect(find.text('Beta Bazaar'), findsWidgets);
 
@@ -102,9 +113,11 @@ void main() {
     await repo.addShopPurchase(shopId: 's1', amount: 300, date: '2026-01-05');
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('People'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Old Name').first);
+    await goShops(tester);
+    // The shop's own card is the last occurrence of its name; the first is the
+    // "Top buyer" headline in the insights card above the list, which opens the
+    // insights screen rather than this shop.
+    await tester.tap(find.text('Old Name').last);
     await tester.pumpAndSettle();
 
     // Edit the shop's name via the edit action.

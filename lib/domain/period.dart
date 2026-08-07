@@ -30,6 +30,23 @@ class Period {
 
   static String fmtDate(DateTime d) => _fmt(d.year, d.month, d.day);
 
+  /// 'YYYY-MM-DD' shifted by [days] (negative goes back). Goes through
+  /// [DateTime] so month and year boundaries are handled for us.
+  static String shiftDays(String iso, int days) {
+    final d = DateTime.parse(iso);
+    return fmtDate(DateTime(d.year, d.month, d.day + days));
+  }
+
+  /// Whole calendar days from [fromIso] to [toIso] — 0 for the same day,
+  /// negative when [toIso] is earlier. Time of day is ignored.
+  static int daysBetween(String fromIso, String toIso) {
+    final a = DateTime.parse(fromIso);
+    final b = DateTime.parse(toIso);
+    return DateTime(b.year, b.month, b.day)
+        .difference(DateTime(a.year, a.month, a.day))
+        .inDays;
+  }
+
   /// [first day of current month, today], using device-local [now].
   static Period thisMonth(DateTime now) => Period(
         from: _fmt(now.year, now.month, 1),
